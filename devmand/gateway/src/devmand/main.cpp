@@ -17,6 +17,7 @@
 #include <devmand/devices/cambium/Device.h>
 #include <devmand/devices/cli/PlaintextCliDevice.h>
 #include <devmand/devices/cli/StructuredUbntDevice.h>
+#include <devmand/devices/cli/StructuredUbntDevice2.h>
 #include <devmand/devices/demo/Device.h>
 #include <devmand/devices/echo/Device.h>
 #include <devmand/devices/frinx/Device.h>
@@ -34,7 +35,7 @@ int main(int argc, char* argv[]) {
   app.init();
 
   // Add services which export the unified view
-  app.addService(std::make_unique<devmand::magma::Service>(app));
+//  app.addService(std::make_unique<devmand::magma::Service>(app));
   // app.addService(std::make_unique<devmand::fscache::Service>(app));
 
   using namespace devmand::devices;
@@ -54,7 +55,7 @@ int main(int argc, char* argv[]) {
     app.addPlatform("Snmp", snmpv2::Device::createDevice);
     app.addPlatform("PlaintextCli", cli::PlaintextCliDevice::createDevice);
     app.addPlatform(
-        "StructuredUbntCli", cli::StructuredUbntDevice::createDevice);
+        "StructuredUbntCli", cli::StructuredUbntDevice2::createDevice);
   }
 
   app.setDefaultPlatform(snmpv2::Device::createDevice);

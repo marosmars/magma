@@ -19,7 +19,7 @@ namespace snmp {
 
 // TODO make this configurable
 const constexpr std::chrono::seconds timeoutCheckInterval{1};
-const constexpr std::chrono::seconds timeoutInterval{50}; // polling interval 55
+const constexpr std::chrono::seconds timeoutInterval{10}; // polling interval 55
 
 Engine::Engine(folly::EventBase& eventBase_, const std::string& appName)
     : channels::Engine("SNMP"), eventBase(eventBase_) {

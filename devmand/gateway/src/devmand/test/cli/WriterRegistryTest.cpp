@@ -26,8 +26,6 @@ using namespace devmand::test::utils::cli;
 using namespace folly;
 using Ifc = openconfig::openconfig_interfaces::Interfaces::Interface;
 
-static const DeviceAccess mockDevice{make_shared<EchoCli>(), "rest"};
-
 class WriterRegistryTest : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -63,8 +61,6 @@ class NoopWriter : public Writer {
 
 class IfcConfigWriter : public BindingWriter<Ifc::Config> {
  public:
-  shared_ptr<CPUThreadPoolExecutor> executor = make_shared<CPUThreadPoolExecutor>(2);
-
   Future<Unit> create(
       const Path& path,
       shared_ptr<Ifc::Config> cfg,
@@ -72,7 +68,7 @@ class IfcConfigWriter : public BindingWriter<Ifc::Config> {
     (void)path;
     return device.cli()
         ->executeWrite(WriteCommand::create("Writing IFC " + cfg->name.value))
-        .via(executor.get())
+        .via(device.executor().get())
         .thenValue([](auto output) {
           (void)output;
           return unit;
@@ -89,7 +85,7 @@ class IfcConfigWriter : public BindingWriter<Ifc::Config> {
     return device.cli()
         ->executeWrite(
             WriteCommand::create("Updating IFC " + after->name.value))
-        .via(executor.get())
+        .via(device.executor().get())
         .thenValue([](auto output) {
           (void)output;
           return unit;
@@ -105,17 +101,18 @@ class IfcConfigWriter : public BindingWriter<Ifc::Config> {
     return device.cli()
         ->executeWrite(
             WriteCommand::create("Deleting IFC " + before->name.value))
-        .via(executor.get())
+        .via(device.executor().get())
         .thenValue([](auto output) {
           (void)output;
           return unit;
         });
-    ;
   }
 };
 
 TEST_F(WriterRegistryTest, api) {
   ModelRegistry models;
+  auto executor = make_shared<CPUThreadPoolExecutor>(2);
+  DeviceAccess mockDevice{make_shared<EchoCli>(), "rest", executor};
   WriterRegistryBuilder reg;
 
   BindingContext& bindingCtx =
@@ -151,6 +148,10 @@ TEST_F(WriterRegistryTest, api) {
            "/openconfig-interfaces:interfaces/interface[name='eth 0/1']/config")},
   };
   r->write(diff, mockDevice);
+
+  // Let the executor finish
+  via(executor.get(), []() {}).get();
+  executor->join();
 }
 
 TEST_F(WriterRegistryTest, writerDependencyLoop) {

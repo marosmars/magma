@@ -17,6 +17,7 @@
 #include <devmand/devices/cambium/Device.h>
 #include <devmand/devices/cli/PlaintextCliDevice.h>
 #include <devmand/devices/cli/StructuredUbntDevice.h>
+#include <devmand/devices/cli/StructuredUbntDevice.h>
 #include <devmand/devices/demo/Device.h>
 #include <devmand/devices/echo/Device.h>
 #include <devmand/devices/frinx/Device.h>
@@ -34,7 +35,7 @@ int main(int argc, char* argv[]) {
   app.init();
 
   // Add services which export the unified view
-  app.addService(std::make_unique<devmand::magma::Service>(app));
+//  app.addService(std::make_unique<devmand::magma::Service>(app));
   // app.addService(std::make_unique<devmand::fscache::Service>(app));
 
   using namespace devmand::devices;

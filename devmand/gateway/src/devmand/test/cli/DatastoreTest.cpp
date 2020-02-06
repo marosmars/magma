@@ -6,6 +6,7 @@
 // of patent rights can be found in the PATENTS file in the same directory.
 
 #define LOG_WITH_GLOG
+
 #include <magma_logging.h>
 
 #include <devmand/channels/cli/datastore/BindingAwareDatastore.h>
@@ -38,8 +39,12 @@ using devmand::channels::cli::datastore::Datastore;
 using devmand::channels::cli::datastore::DatastoreDiff;
 using devmand::channels::cli::datastore::DatastoreException;
 using devmand::channels::cli::datastore::DatastoreTransaction;
+using devmand::channels::cli::datastore::DiffPath;
 using devmand::devices::cli::BindingCodec;
 using devmand::devices::cli::SchemaContext;
+using devmand::test::utils::cli::networkInstances;
+using devmand::test::utils::cli::updated011Interface;
+using devmand::test::utils::cli::counterPath;
 using devmand::test::utils::cli::interface02state;
 using devmand::test::utils::cli::interface02TopPath;
 using devmand::test::utils::cli::interfaceCounters;
@@ -47,6 +52,8 @@ using devmand::test::utils::cli::newInterface;
 using devmand::test::utils::cli::newInterfaceTopPath;
 using devmand::test::utils::cli::openconfigInterfacesInterfaces;
 using devmand::test::utils::cli::operStatus;
+using devmand::test::utils::cli::statePath;
+using devmand::test::utils::cli::statePathWithKey;
 using folly::parseJson;
 using folly::toPrettyJson;
 using std::to_string;
@@ -369,7 +376,6 @@ TEST_F(DatastoreTest, diffAfterMerge) {
 
   const map<Path, DatastoreDiff>& map = transaction->diff();
   Path diffKey(operStatus);
-  MLOG(MINFO) << "FIRST: " << map.at(diffKey).before;
   EXPECT_EQ(
       map.at(diffKey).before["openconfig-interfaces:oper-status"], "DOWN");
   EXPECT_EQ(map.at(diffKey).after["openconfig-interfaces:oper-status"], "UP");
@@ -431,6 +437,124 @@ TEST_F(DatastoreTest, twoTransactionsAtTheSameTimeNotPermited) {
 
   const unique_ptr<DatastoreTransaction>& trans1 = datastore->newTx();
   EXPECT_THROW(bindingAwareDatastore.newBindingTx(), DatastoreException);
+}
+
+TEST_F(DatastoreTest, diffMultipleOperations) {
+  Datastore datastore(Datastore::operational(), schemaContext);
+  unique_ptr<channels::cli::datastore::DatastoreTransaction> transaction =
+      datastore.newTx();
+  transaction->overwrite(Path("/"), parseJson(openconfigInterfacesInterfaces));
+  transaction->delete_(interface02TopPath + "/state");
+  transaction->commit();
+  transaction = datastore.newTx();
+  dynamic interface02 =
+      transaction->read(interface02TopPath); //+ "/state/counters"
+  interface02["openconfig-interfaces:interface"][0]["state"] =
+      folly::dynamic::object();
+  interface02["openconfig-interfaces:interface"][0]["state"]["counters"] =
+      folly::dynamic::object();
+  interface02["openconfig-interfaces:interface"][0]["state"]["counters"]
+             ["in-errors"] = 7;
+  interface02["openconfig-interfaces:interface"][0]["state"]["admin-status"] =
+      "DOWN";
+  interface02["openconfig-interfaces:interface"][0]["config"]["mtu"] = 1400;
+  interface02["openconfig-interfaces:interface"][0]["config"]["enabled"] =
+      false;
+  transaction->overwrite(interface02TopPath, interface02);
+  vector<DiffPath> paths;
+  Path p1(statePath);
+  Path p2(counterPath);
+  paths.emplace_back(p1, false, false);
+  paths.emplace_back(p2, false, false);
+
+  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+
+  auto it = multimap.equal_range(statePath.c_str());
+
+  for (auto itr = it.first; itr != it.second; ++itr) {
+    EXPECT_EQ(statePath, itr->first.str());
+    EXPECT_EQ(DatastoreDiffType::create, itr->second.type);
+    MLOG(MINFO) << itr->second.path.str();
+    MLOG(MINFO) << itr->second.keyedPath.str();
+    if(itr->second.keyedPath.str() == statePathWithKey){
+    EXPECT_EQ(statePathWithKey, itr->second.keyedPath.str());
+    } else {
+        EXPECT_EQ(statePathWithKey + "/counters", itr->second.keyedPath.str());
+    }
+  }
+}
+
+TEST_F(DatastoreTest, diffDeleteOperation) {
+  Datastore datastore(Datastore::operational(), schemaContext);
+  unique_ptr<channels::cli::datastore::DatastoreTransaction> transaction =
+      datastore.newTx();
+  transaction->overwrite(Path("/"), parseJson(openconfigInterfacesInterfaces));
+  transaction->commit();
+  transaction = datastore.newTx();
+  transaction->delete_(interface02TopPath + "/state");
+
+  vector<DiffPath> paths;
+  Path p1("/openconfig-interfaces:interfaces/openconfig-interfaces:interface");
+  paths.emplace_back(p1, false, false);
+
+  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+  for (const auto& multi : multimap) {
+    MLOG(MINFO) << "key: " << multi.first << " handles: " << multi.second.path
+                << " (type: " << multi.second.type << ")"
+                << " before: " << toPrettyJson(multi.second.before);
+  }
+}
+
+        TEST_F(DatastoreTest, failingTest) {
+            Datastore datastore(Datastore::operational(), schemaContext);
+            unique_ptr<channels::cli::datastore::DatastoreTransaction> transaction =
+                    datastore.newTx();
+            transaction->overwrite(Path("/"), parseJson(networkInstances));
+            transaction->commit();
+            transaction = datastore.newTx();
+            const char* interface85 =
+                    "/openconfig-interfaces:interfaces/interface[name='0/11']";
+
+            transaction->merge(Path(interface85), parseJson(updated011Interface));
+
+            vector<DiffPath> paths;
+            Path p1("/openconfig-interfaces:interfaces/openconfig-interfaces:interface/openconfig-interfaces:config");
+            paths.emplace_back(p1, true, false);
+
+            const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+            for (const auto& multi : multimap) {
+                MLOG(MINFO) << "key: " << multi.first.str() << " handles:  " <<  multi.second.keyedPath.str();
+            }
+
+//            const map<Path, DatastoreDiff> &map = transaction->diff();
+//            for (const auto& item : map) {
+//                MLOG(MINFO) << "key: " << item.first.str() << " handles:  " <<  item.second.keyedPath.str() << " type: " <<  item.second.type;
+//            }
+        }
+
+
+
+
+TEST_F(DatastoreTest, diff2changes) {
+  shared_ptr<Datastore> datastore =
+      std::make_shared<Datastore>(Datastore::operational(), schemaContext);
+  const unique_ptr<DatastoreTransaction>& transaction = datastore->newTx();
+
+  transaction->overwrite(Path("/"), parseJson(openconfigInterfacesInterfaces));
+
+  transaction->commit();
+  const unique_ptr<DatastoreTransaction>& transaction2 = datastore->newTx();
+  dynamic errors = transaction2->read(interface02TopPath + "/state/counters");
+  errors["openconfig-interfaces:counters"]["out-errors"] = "777";
+  errors["openconfig-interfaces:counters"]["out-discards"] = "17";
+  transaction2->merge(interface02TopPath + "/state/counters", errors);
+  vector<DiffPath> paths;
+  paths.emplace_back(Path(interfaceCounters), false, false);
+  const std::multimap<Path, DatastoreDiff>& multimap =
+      transaction2->diff(paths);
+  for (const auto& multi : multimap) {
+    MLOG(MINFO) << "key: " << multi.first << " handles: " << multi.second.path;
+  }
 }
 
 } // namespace cli

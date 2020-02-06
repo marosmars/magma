@@ -36,8 +36,23 @@ using folly::dynamic;
 using folly::parseJson;
 using std::atomic_bool;
 using std::runtime_error;
+using std::vector;
+using folly::Optional;
+using std::multimap;
 
 namespace devmand::channels::cli::datastore {
+
+struct DiffPath {
+  Path path;
+  bool asterix;
+  bool empty = false;
+
+  DiffPath() : path("/"), asterix(false), empty(true){
+
+  }
+
+  DiffPath(const Path _path, bool _asterix, bool _empty) : path(_path), asterix(_asterix), empty(_empty) {}
+};
 
 class DatastoreTransaction {
  private:
@@ -57,14 +72,24 @@ class DatastoreTransaction {
   void print(lllyd_node* nodeToPrint);
   void checkIfCommitted();
   string toJson(lllyd_node* initial);
+  static void addKeysToPath(lllyd_node* node, std::stringstream & path);
   static dynamic appendAllParents(Path path, const dynamic& aDynamic);
+  static Path unifyLength(Path registeredPath, Path keyedPath);
+  Optional<DiffPath> pickClosestPath(Path, vector<DiffPath> paths);
+  map<Path, DatastoreDiff> splitDiff(DatastoreDiff diff);
+  void splitToMany(Path p, dynamic input, vector<std::pair<string, dynamic>>  & v);
+  Optional<Path> getRegisteredPath(vector<DiffPath> registeredPaths, Path path);
+  dynamic read(Path path, lllyd_node* node);
+  dynamic readAlreadyCommitted(Path path);
 
- public:
-  DatastoreTransaction(shared_ptr<DatastoreState> datastoreState);
+public:
+
+    DatastoreTransaction(shared_ptr<DatastoreState> datastoreState);
 
   dynamic read(Path path);
   void print();
   map<Path, DatastoreDiff> diff();
+  multimap<Path, DatastoreDiff> diff(vector<DiffPath> registeredPaths);
   bool isValid();
   bool delete_(Path path);
   void merge(Path path, const dynamic& aDynamic);

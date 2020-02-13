@@ -11,6 +11,7 @@
 #include <devmand/devices/cli/schema/ModelRegistry.h>
 #include <devmand/devices/cli/translation/BindingReaderRegistry.h>
 #include <devmand/devices/cli/translation/BindingWriterRegistry.h>
+#include <devmand/devices/cli/translation/GrpcReader.h>
 #include <devmand/devices/cli/translation/PluginRegistry.h>
 #include <devmand/devices/cli/translation/ReaderRegistry.h>
 #include <folly/futures/Future.h>
@@ -100,29 +101,35 @@ static Future<vector<string>> invokeReads(
 
 class IfcConfigReader : public Reader {
  public:
+  static dynamic parseInterfaceOutput(
+      const string& out,
+      const string& ifcName) {
+    dynamic config = dynamic::object;
+    config["name"] = ifcName;
+    parseValue(out, mtuRegx, 1, [&config](auto mtuAsString) {
+      config["mtu"] = toUI16(mtuAsString);
+    });
+    parseValue(out, descrRegx, 1, [&config](auto descrAsString) {
+      config["description"] = descrAsString;
+    });
+    config["enabled"] = true;
+    parseValue(out, shutRegx, 0, [&config](auto shutdownAsString) {
+      (void)shutdownAsString;
+      config["enabled"] = false;
+    });
+    parseValue(out, typeRegx, 1, [&config](auto typeAsString) {
+      config["type"] = parseIfcType(typeAsString);
+    });
+    return config;
+  }
+
   Future<dynamic> read(const Path& path, const DeviceAccess& device)
       const override {
     string ifcName = path.getKeysFromSegment("interface")["name"].getString();
 
     return invokeRead(device, "show running-config interface " + ifcName)
-        .thenValue([ifcName](auto out) {
-          dynamic config = dynamic::object;
-          config["name"] = ifcName;
-          parseValue(out, mtuRegx, 1, [&config](auto mtuAsString) {
-            config["mtu"] = toUI16(mtuAsString);
-          });
-          parseValue(out, descrRegx, 1, [&config](auto descrAsString) {
-            config["description"] = descrAsString;
-          });
-          config["enabled"] = true;
-          parseValue(out, shutRegx, 0, [&config](auto shutdownAsString) {
-            (void)shutdownAsString;
-            config["enabled"] = false;
-          });
-          parseValue(out, typeRegx, 1, [&config](auto typeAsString) {
-            config["type"] = parseIfcType(typeAsString);
-          });
-          return config;
+        .thenValue([ifcName](string out) {
+          return parseInterfaceOutput(out, ifcName);
         });
   }
 };
@@ -336,6 +343,13 @@ class IfcCountersReader : public BindingReader {
 
 void cli::UbntInterfacePlugin::provideReaders(
     ReaderRegistryBuilder& reg) const {
+  const string remotePluginId = "localhost:50051"; // TODO
+  shared_ptr<Executor> remotePluginExecutor =
+      make_shared<CPUThreadPoolExecutor>(1); // TODO
+  auto remotePluginChannel = grpc::CreateChannel(
+      "localhost:50051", grpc::InsecureChannelCredentials());
+  auto remoteReaderPlugin = make_shared<GrpcReader>(
+      remotePluginChannel, remotePluginId, remotePluginExecutor);
   // List reader is a DOM lambda
   reg.addList(
       "/openconfig-interfaces:interfaces/interface",
@@ -355,9 +369,12 @@ void cli::UbntInterfacePlugin::provideReaders(
       });
 
   // Reader is a DOM class
+  //  reg.add(
+  //      "/openconfig-interfaces:interfaces/interface/config",
+  //      make_shared<IfcConfigReader>());
+
   reg.add(
-      "/openconfig-interfaces:interfaces/interface/config",
-      make_shared<IfcConfigReader>());
+      "/openconfig-interfaces:interfaces/interface/config", remoteReaderPlugin);
 
   // Reader is a Binding-aware class
   BINDING(reg, openconfigContext)

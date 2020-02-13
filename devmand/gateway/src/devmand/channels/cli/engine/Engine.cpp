@@ -54,7 +54,7 @@ void Engine::initLogging(uint32_t verbosity, bool callInitMlog) {
     spdlog::set_level(spdlog::level::level_enum::info);
 
     // Disable libyang logs
-    llly_log_options(0);
+//    llly_log_options(0);
   } else {
     MLOG(MWARNING) << "Logging already initialized";
   }

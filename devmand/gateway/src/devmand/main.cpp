@@ -17,7 +17,7 @@
 #include <devmand/devices/cambium/Device.h>
 #include <devmand/devices/cli/PlaintextCliDevice.h>
 #include <devmand/devices/cli/StructuredUbntDevice.h>
-#include <devmand/devices/cli/StructuredUbntDevice.h>
+#include <devmand/devices/cli/StructuredLinuxDevice.h>
 #include <devmand/devices/demo/Device.h>
 #include <devmand/devices/echo/Device.h>
 #include <devmand/devices/frinx/Device.h>
@@ -56,6 +56,8 @@ int main(int argc, char* argv[]) {
     app.addPlatform("PlaintextCli", cli::PlaintextCliDevice::createDevice);
     app.addPlatform(
         "StructuredUbntCli", cli::StructuredUbntDevice::createDevice);
+    app.addPlatform(
+        "StructuredLinuxCli", cli::StructuredLinuxDevice::createDevice);
   }
 
   app.setDefaultPlatform(snmpv2::Device::createDevice);

@@ -51,7 +51,7 @@ lllyd_node* DatastoreTransaction::dynamic2lydNode(dynamic entity) {
       LLLYD_JSON,
       datastoreTypeToLydOption() | LLLYD_OPT_TRUSTED);
   if (result == nullptr) {
-    throw DatastoreException("Unable to create subtree from provided data");
+    throw DatastoreException("Unable to create subtree from provided data due to: " + string(llly_errmsg(datastoreState->ctx)));
   }
 
   return result;
@@ -432,13 +432,13 @@ bool DatastoreTransaction::isValid() {
 int DatastoreTransaction::datastoreTypeToLydOption() {
   switch (datastoreState->type) {
     case operational:
-      return LLLYD_OPT_GET; // operational validation, turns off validation for
+      return LLLYD_OPT_GET | LLLYD_OPT_STRICT; // operational validation, turns off validation for
       // things like mandatory nodes, leaf-refs etc.
       // because devices do not have to support all
       // mandatory nodes (like BGP) and thus would only
       // cause false validation errors
     case config:
-      return LLLYD_OPT_GETCONFIG; // config validation with turned off checks
+      return LLLYD_OPT_GETCONFIG | LLLYD_OPT_STRICT; // config validation with turned off checks
       // because of reasons mentioned above
   }
   return 0;

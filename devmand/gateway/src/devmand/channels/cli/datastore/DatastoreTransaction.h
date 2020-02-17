@@ -54,11 +54,12 @@ struct DiffPath {
 struct DiffResult {
   multimap<Path, DatastoreDiff> diffs;
   vector<Path> unhandledDiffs;
-  void appendUnhandledPath(Path pathToAppend){
-      unhandledDiffs.emplace_back(pathToAppend);
+  void appendUnhandledPath(Path pathToAppend) {
+    unhandledDiffs.emplace_back(pathToAppend);
   }
   DiffResult(
-      const multimap <Path, DatastoreDiff> &_diffs, const vector<Path> &_unhandledDiffs)
+      const multimap<Path, DatastoreDiff>& _diffs,
+      const vector<Path>& _unhandledDiffs)
       : diffs(_diffs), unhandledDiffs(_unhandledDiffs) {}
 };
 
@@ -91,9 +92,11 @@ class DatastoreTransaction {
   dynamic read(Path path, lllyd_node* node);
   dynamic readAlreadyCommitted(Path path);
   map<Path, DatastoreDiff> diff(lllyd_node* a, lllyd_node* b);
-  void filterMap(vector<string> moduleNames,  map<Path, DatastoreDiff> & map);
+  void filterMap(vector<string> moduleNames, map<Path, DatastoreDiff>& map);
   void freeRoot();
-  void freeRoot(lllyd_node *r);
+  void freeRoot(lllyd_node* r);
+  llly_set* findNode(lllyd_node* node, string path);
+
  public:
   DatastoreTransaction(shared_ptr<DatastoreState> datastoreState);
 

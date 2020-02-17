@@ -42,21 +42,21 @@ using devmand::channels::cli::datastore::DatastoreTransaction;
 using devmand::channels::cli::datastore::DiffPath;
 using devmand::devices::cli::BindingCodec;
 using devmand::devices::cli::SchemaContext;
-using devmand::test::utils::cli::networkInstances;
-using devmand::test::utils::cli::threeTrees;
-using devmand::test::utils::cli::threeTrees2;
-using devmand::test::utils::cli::updated011Interface;
 using devmand::test::utils::cli::counterPath;
 using devmand::test::utils::cli::interface02state;
 using devmand::test::utils::cli::interface02TopPath;
 using devmand::test::utils::cli::interfaceCounters;
 using devmand::test::utils::cli::interfaceCountersWithKey;
+using devmand::test::utils::cli::networkInstances;
 using devmand::test::utils::cli::newInterface;
 using devmand::test::utils::cli::newInterfaceTopPath;
 using devmand::test::utils::cli::openconfigInterfacesInterfaces;
 using devmand::test::utils::cli::operStatus;
 using devmand::test::utils::cli::statePath;
 using devmand::test::utils::cli::statePathWithKey;
+using devmand::test::utils::cli::threeTrees;
+using devmand::test::utils::cli::updated011Interface;
+using devmand::test::utils::cli::vlans2;
 using folly::parseJson;
 using folly::toPrettyJson;
 using std::to_string;
@@ -76,7 +76,7 @@ class DatastoreTest : public ::testing::Test {
   DatastoreTest()
       : cliEngine(std::make_unique<channels::cli::Engine>()),
         schemaContext(cliEngine->getModelRegistry()->getSchemaContext(
-                Model::OPENCONFIG_2_4_3)) {}
+            Model::OPENCONFIG_2_4_3)) {}
 
  protected:
   void SetUp() override {
@@ -97,14 +97,14 @@ static shared_ptr<OpenconfigInterfaces> ydkInterfaces() {
   interface->config->enabled = true;
   interface->config->mtu = 1500;
   interface->config->description = "this is a config description";
-  interface->config->type = ietf::iana_if_type::EthernetCsmacd();
+  interface->config->type = openconfig::iana_if_type::EthernetCsmacd();
   interface->state->admin_status = "UP";
   interface->state->description = "dummy state";
   interface->state->enabled = true;
   interface->state->mtu = 1518;
   interface->state->oper_status = "DOWN";
   interface->state->name = "0/2";
-  interface->state->type = ietf::iana_if_type::EthernetCsmacd();
+  interface->state->type = openconfig::iana_if_type::EthernetCsmacd();
   interfaces->interface.append(interface);
   return interfaces;
 }
@@ -499,70 +499,69 @@ TEST_F(DatastoreTest, diffDeleteOperation) {
 
   const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
   for (const auto& multi : multimap) {
-      EXPECT_EQ(p1.str(), multi.first.str());
-      EXPECT_EQ(p1.str() + "/openconfig-interfaces:state", multi.second.path.str());
-      EXPECT_EQ(DatastoreDiffType::deleted, multi.second.type);
+    EXPECT_EQ(p1.str(), multi.first.str());
+    EXPECT_EQ(
+        p1.str() + "/openconfig-interfaces:state", multi.second.path.str());
+    EXPECT_EQ(DatastoreDiffType::deleted, multi.second.type);
   }
 }
 
-        TEST_F(DatastoreTest, twoIdenpendentTreesDiffUpdateTest) {
-            Datastore datastore(Datastore::operational(), schemaContext);
-            unique_ptr<channels::cli::datastore::DatastoreTransaction> transaction =
-                    datastore.newTx();
-            transaction->overwrite(Path("/"), parseJson(networkInstances));
-            transaction->commit();
-            transaction = datastore.newTx();
-            transaction->merge(Path("/openconfig-interfaces:interfaces/interface[name='0/11']"), parseJson(updated011Interface));
+TEST_F(DatastoreTest, twoIdenpendentTreesDiffUpdateTest) {
+  Datastore datastore(Datastore::operational(), schemaContext);
+  unique_ptr<channels::cli::datastore::DatastoreTransaction> transaction =
+      datastore.newTx();
+  transaction->overwrite(Path("/"), parseJson(networkInstances));
+  transaction->commit();
+  transaction = datastore.newTx();
+  transaction->merge(
+      Path("/openconfig-interfaces:interfaces/interface[name='0/11']"),
+      parseJson(updated011Interface));
 
-            vector<DiffPath> paths;
-            Path p1("/openconfig-interfaces:interfaces/openconfig-interfaces:interface/openconfig-interfaces:config");
-            paths.emplace_back(p1, true);
+  vector<DiffPath> paths;
+  Path p1(
+      "/openconfig-interfaces:interfaces/openconfig-interfaces:interface/openconfig-interfaces:config");
+  paths.emplace_back(p1, true);
 
-            const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
-            for (const auto& multi : multimap) {
-                MLOG(MINFO) << "key: " << multi.first.str() << " handles:  " <<  multi.second.keyedPath.str();
-            }
+  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+  for (const auto& multi : multimap) {
+    MLOG(MINFO) << "key: " << multi.first.str()
+                << " handles:  " << multi.second.keyedPath.str();
+  }
 
-            EXPECT_EQ(multimap.begin()->first.str(), "/openconfig-interfaces:interfaces/openconfig-interfaces:interface/openconfig-interfaces:config");
-            EXPECT_EQ(multimap.begin()->second.keyedPath.str(), "/openconfig-interfaces:interfaces/openconfig-interfaces:interface[name='0/11']/openconfig-interfaces:config");
-            EXPECT_EQ(multimap.begin()->second.type, DatastoreDiffType::update);
-        }
+  EXPECT_EQ(
+      multimap.begin()->first.str(),
+      "/openconfig-interfaces:interfaces/openconfig-interfaces:interface/openconfig-interfaces:config");
+  EXPECT_EQ(
+      multimap.begin()->second.keyedPath.str(),
+      "/openconfig-interfaces:interfaces/openconfig-interfaces:interface[name='0/11']/openconfig-interfaces:config");
+  EXPECT_EQ(multimap.begin()->second.type, DatastoreDiffType::update);
+}
 
+TEST_F(DatastoreTest, threeIndenpendentTreesDiffDeleteTest) {
+  Datastore datastore(Datastore::operational(), schemaContext);
+  unique_ptr<channels::cli::datastore::DatastoreTransaction> transaction =
+      datastore.newTx();
+  transaction->overwrite(Path("/"), parseJson(threeTrees));
+  transaction->commit();
+  transaction = datastore.newTx();
+  transaction->delete_(Path(
+      "/openconfig-network-instance:network-instances/network-instance['default']/config"));
 
+  vector<DiffPath> paths;
+  Path p1(
+      "/openconfig-network-instance:network-instances/openconfig-network-instance:network-instance");
+  paths.emplace_back(p1, false);
 
-        TEST_F(DatastoreTest, threeIdenpendentTreesDiffUpdateTest) {
-            Datastore datastore(Datastore::operational(), schemaContext);
-            unique_ptr<channels::cli::datastore::DatastoreTransaction> transaction =
-                    datastore.newTx();
-            transaction->overwrite(Path("/"), parseJson(threeTrees2));
-            transaction->commit();
-//            transaction = datastore.newTx();
-//            transaction->delete_(Path("/openconfig-network-instance:network-instances/network-instance['default']/config"));
+  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
 
-//            vector<DiffPath> paths;
-//            Path p1("/openconfig-network-instance:network-instances/");
-//            paths.emplace_back(p1, true);
-//
-//            const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
-//            for (const auto& multi : multimap) {
-//                MLOG(MINFO) << "key: " << multi.first.str() << " handles:  " <<  multi.second.keyedPath.str();
-//            }
-
-//            EXPECT_EQ(multimap.begin()->first.str(), "/openconfig-interfaces:interfaces/openconfig-interfaces:interface/openconfig-interfaces:config");
-//            EXPECT_EQ(multimap.begin()->second.keyedPath.str(), "/openconfig-interfaces:interfaces/openconfig-interfaces:interface[name='0/11']/openconfig-interfaces:config");
-//            EXPECT_EQ(multimap.begin()->second.type, DatastoreDiffType::update);
-        }
-
-
-
-
-
-
-
-
-
-
-
+  EXPECT_EQ(
+      multimap.begin()->first.str(),
+      "/openconfig-network-instance:network-instances/openconfig-network-instance:network-instance");
+  EXPECT_EQ(
+      multimap.begin()->second.keyedPath.str(),
+      "/openconfig-network-instance:network-instances/openconfig-network-instance:network-instance[name='default']");
+  EXPECT_EQ(multimap.begin()->second.type, DatastoreDiffType::deleted);
+}
 
 TEST_F(DatastoreTest, diff2changes) {
   shared_ptr<Datastore> datastore =
@@ -579,7 +578,8 @@ TEST_F(DatastoreTest, diff2changes) {
   transaction2->merge(interface02TopPath + "/state/counters", counters);
   vector<DiffPath> paths;
   paths.emplace_back(Path(interfaceCounters), false);
-  const std::multimap<Path, DatastoreDiff>& multimap = transaction2->diff(paths);
+  const std::multimap<Path, DatastoreDiff>& multimap =
+      transaction2->diff(paths);
   for (const auto& multi : multimap) {
     EXPECT_EQ(multi.first.str(), interfaceCounters);
     if (interfaceCountersWithKey + "/openconfig-interfaces:out-discards" ==
@@ -596,6 +596,94 @@ TEST_F(DatastoreTest, diff2changes) {
     MLOG(MINFO) << "key: " << multi.first
                 << " handles: " << multi.second.keyedPath;
   }
+}
+
+TEST_F(DatastoreTest, threeIndenpendentTreesUpdateReadTest) {
+  Datastore datastore(Datastore::operational(), schemaContext);
+  unique_ptr<channels::cli::datastore::DatastoreTransaction> transaction =
+      datastore.newTx();
+  transaction->overwrite(Path("/"), parseJson(threeTrees));
+  transaction->commit();
+  transaction = datastore.newTx();
+  const Path& vlanPath = Path(
+      "/openconfig-network-instance:network-instances/network-instance[name='default']/vlans");
+  dynamic vlans = transaction->read(vlanPath);
+
+  vlans["openconfig-network-instance:vlans"]["vlan"][0]["state"]["status"] =
+      "SUSPENDED";
+  vlans["openconfig-network-instance:vlans"]["vlan"][0]["config"]["status"] =
+      "SUSPENDED";
+  transaction->overwrite(vlanPath, vlans);
+  vector<DiffPath> paths;
+  Path p1(
+      "/openconfig-network-instance:network-instances/openconfig-network-instance:network-instance"
+      "/openconfig-network-instance:vlans/openconfig-network-instance:vlan/openconfig-network-instance:state");
+  paths.emplace_back(p1, false);
+
+  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+
+  EXPECT_EQ(
+      multimap.begin()->first.str(),
+      "/openconfig-network-instance:network-instances/openconfig-network-instance:network-instance"
+      "/openconfig-network-instance:vlans/openconfig-network-instance:vlan/openconfig-network-instance:state");
+  EXPECT_EQ(
+      multimap.begin()->second.keyedPath.str(),
+      "/openconfig-network-instance:network-instances/openconfig-network-instance:network-instance[name='default']/openconfig-network-instance:vlans"
+      "/openconfig-network-instance:vlan[vlan-id='1']/openconfig-network-instance:state");
+  EXPECT_EQ(multimap.begin()->second.type, DatastoreDiffType::update);
+}
+
+TEST_F(DatastoreTest, threeIndenpendentTreescreateReadTest) {
+  Datastore datastore(Datastore::operational(), schemaContext);
+  unique_ptr<channels::cli::datastore::DatastoreTransaction> transaction =
+      datastore.newTx();
+  transaction->overwrite(Path("/"), parseJson(threeTrees));
+  transaction->commit();
+  transaction = datastore.newTx();
+  const Path& vlanPath = Path(
+      "/openconfig-network-instance:network-instances/network-instance[name='default']/vlans");
+  dynamic vlans = transaction->read(vlanPath);
+
+  vlans["openconfig-network-instance:vlans"]["vlan"][4] = dynamic::object();
+  vlans["openconfig-network-instance:vlans"]["vlan"][4]["vlan-id"] = 666;
+
+  vlans["openconfig-network-instance:vlans"]["vlan"][4]["state"] =
+      dynamic::object();
+  vlans["openconfig-network-instance:vlans"]["vlan"][4]["state"]["status"] =
+      "SUSPENDED";
+  vlans["openconfig-network-instance:vlans"]["vlan"][4]["state"]["vlan-id"] =
+      666;
+
+  vlans["openconfig-network-instance:vlans"]["vlan"][4]["config"] =
+      dynamic::object();
+  vlans["openconfig-network-instance:vlans"]["vlan"][4]["config"]["status"] =
+      "SUSPENDED";
+  vlans["openconfig-network-instance:vlans"]["vlan"][4]["config"]["vlan-id"] =
+      666;
+
+  transaction->overwrite(vlanPath, vlans);
+  vector<DiffPath> paths;
+  Path p1(
+      "/openconfig-network-instance:network-instances/openconfig-network-instance:network-instance"
+      "/openconfig-network-instance:vlans/openconfig-network-instance:vlan/openconfig-network-instance:state");
+  paths.emplace_back(p1, false);
+
+  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+
+  for (const auto& multi : multimap) {
+    MLOG(MINFO) << "key: " << multi.first.str()
+                << " handles:  " << multi.second.keyedPath.str();
+  }
+
+  //  EXPECT_EQ(
+  //      multimap.begin()->first.str(),
+  //      "/openconfig-network-instance:network-instances/openconfig-network-instance:network-instance"
+  //      "/openconfig-network-instance:vlans/openconfig-network-instance:vlan/openconfig-network-instance:state");
+  //  EXPECT_EQ(
+  //      multimap.begin()->second.keyedPath.str(),
+  //      "/openconfig-network-instance:network-instances/openconfig-network-instance:network-instance[name='default']/openconfig-network-instance:vlans"
+  //      "/openconfig-network-instance:vlan[vlan-id='1']/openconfig-network-instance:state");
+  //  EXPECT_EQ(multimap.begin()->second.type, DatastoreDiffType::update);
 }
 
 } // namespace cli

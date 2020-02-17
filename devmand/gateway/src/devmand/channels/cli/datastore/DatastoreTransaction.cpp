@@ -25,7 +25,18 @@ bool DatastoreTransaction::delete_(Path p) {
   if (path.empty() || root == nullptr) {
     return false;
   }
-  llly_set* pSet = lllyd_find_path(root, const_cast<char*>(path.c_str()));
+
+  llly_set* pSet = findNode(root, p.str());
+  //  lllyd_node* tmp = root;
+  //  lllyd_node* next;
+  //   nullptr;
+  //  while (tmp != nullptr && pSet == nullptr) {
+  //    next = tmp->next;
+  //    tmp->next = nullptr;
+  //    pSet = lllyd_find_path(tmp, const_cast<char*>(path.c_str()));
+  //    tmp = next;
+  //  }
+
   if (pSet == nullptr) {
     MLOG(MDEBUG) << "Nothing to delete, " + path + " not found";
     return false;
@@ -52,8 +63,12 @@ lllyd_node* DatastoreTransaction::dynamic2lydNode(dynamic entity) {
       LLLYD_JSON,
       datastoreTypeToLydOption() | LLLYD_OPT_TRUSTED);
   if (result == nullptr) {
-    string lyErrMessage(llly_errmsg(datastoreState->ctx) == nullptr ? "" : llly_errmsg(datastoreState->ctx));
-    throw DatastoreException("Unable to create subtree from provided data " + lyErrMessage);
+    string lyErrMessage(
+        llly_errmsg(datastoreState->ctx) == nullptr
+            ? ""
+            : llly_errmsg(datastoreState->ctx));
+    throw DatastoreException(
+        "Unable to create subtree from provided data " + lyErrMessage);
   }
 
   return result;
@@ -93,24 +108,23 @@ void DatastoreTransaction::merge(const Path path, const dynamic& aDynamic) {
     lllyd_node* pNode = dynamic2lydNode(withParents);
 
     if (root != nullptr) { // there exists something to merge to
-        lllyd_node * tmp = root;
-        lllyd_node * next;
-        while(tmp != nullptr){
-            next = tmp->next;
-            tmp->next = nullptr;
-            lllyd_merge(tmp, pNode, 0);
-            tmp = next;
-        }
+      lllyd_node* tmp = root;
+      lllyd_node* next;
+      while (tmp != nullptr) {
+        next = tmp->next;
+        tmp->next = nullptr;
+        lllyd_merge(tmp, pNode, 0);
+        tmp = next;
+      }
 
     } else {
       root = pNode;
     }
-   freeRoot(pNode);
+    freeRoot(pNode);
   } else {
     freeRoot();
     root = dynamic2lydNode(aDynamic);
   }
-
 }
 
 void DatastoreTransaction::commit() {
@@ -120,7 +134,7 @@ void DatastoreTransaction::commit() {
   lllyd_node* rootToBeMerged = computeRoot(
       root); // need the real root for convenience and copy via lllyd_dup
   if (!datastoreState->isEmpty()) {
-      freeRoot(datastoreState->root);
+    freeRoot(datastoreState->root);
   }
   datastoreState->root = rootToBeMerged;
 
@@ -169,17 +183,16 @@ string DatastoreTransaction::toJson(lllyd_node* initial) {
 DatastoreTransaction::DatastoreTransaction(
     shared_ptr<DatastoreState> _datastoreState)
     : datastoreState(_datastoreState) {
+  if (not datastoreState->isEmpty()) {
+    root = lllyd_dup(datastoreState->root, 1);
 
-    if (not datastoreState->isEmpty()) {
-      root = lllyd_dup(datastoreState->root, 1);
-
-      lllyd_node *tmp = datastoreState->root->next;
-      lllyd_node * tmpRoot = root;
-      while(tmp != nullptr){
-          tmpRoot->next = lllyd_dup(tmp, 1);
-          tmpRoot = tmpRoot->next;
-          tmp = tmp->next;
-      }
+    lllyd_node* tmp = datastoreState->root->next;
+    lllyd_node* tmpRoot = root;
+    while (tmp != nullptr) {
+      tmpRoot->next = lllyd_dup(tmp, 1);
+      tmpRoot = tmpRoot->next;
+      tmp = tmp->next;
+    }
   }
 }
 
@@ -190,54 +203,58 @@ lllyd_node* DatastoreTransaction::computeRoot(lllyd_node* n) {
   return n;
 }
 
-void DatastoreTransaction::filterMap(vector<string> moduleNames, map<Path, DatastoreDiff> & data){
-    vector<Path> toBeDeleted;
-    for (const auto &m : data) {
-        for (const auto &moduleName : moduleNames) {
-            if(m.first.str().rfind(moduleName, 0) == 0){
-                toBeDeleted.emplace_back(m.first);
-            }
-        }
+void DatastoreTransaction::filterMap(
+    vector<string> moduleNames,
+    map<Path, DatastoreDiff>& data) {
+  vector<Path> toBeDeleted;
+  for (const auto& m : data) {
+    for (const auto& moduleName : moduleNames) {
+      if (m.first.str().rfind(moduleName, 0) == 0) {
+        toBeDeleted.emplace_back(m.first);
+      }
     }
-    for (const auto &beDeleted : toBeDeleted) {
-        data.erase(beDeleted);
-    }
+  }
+  for (const auto& beDeleted : toBeDeleted) {
+    data.erase(beDeleted);
+  }
 }
 
 map<Path, DatastoreDiff> DatastoreTransaction::diff() {
-    map<Path, DatastoreDiff> allDiffs;
-    lllyd_node* a = datastoreState->root;
-    lllyd_node* b = root;
-    vector<string> previousModuleNames;
-    while(a != nullptr && b != nullptr) {
-        lllyd_node* aNext = a->next;
-        lllyd_node* bNext = b->next;
-        a->next = nullptr;
-        b->next = nullptr;
-        map<Path, DatastoreDiff> partialDiff = diff(a, b);
-        std::stringstream moduleAndNodeName ;
-        moduleAndNodeName << "/" << a->schema->module->name << ":" << a->schema->name;
-        filterMap(previousModuleNames, partialDiff);
-        allDiffs.insert(partialDiff.begin(), partialDiff.end());
-        a->next = aNext;
-        b->next = bNext;
-        a = aNext;
-        b = bNext;
-        previousModuleNames.emplace_back(moduleAndNodeName.str());
-    }
+  map<Path, DatastoreDiff> allDiffs;
+  lllyd_node* a = datastoreState->root;
+  lllyd_node* b = root;
+  vector<string> previousModuleNames;
+  while (a != nullptr && b != nullptr) {
+    lllyd_node* aNext = a->next;
+    lllyd_node* bNext = b->next;
+    a->next = nullptr;
+    b->next = nullptr;
+    map<Path, DatastoreDiff> partialDiff = diff(a, b);
+    std::stringstream moduleAndNodeName;
+    moduleAndNodeName << "/" << a->schema->module->name << ":"
+                      << a->schema->name;
+    filterMap(previousModuleNames, partialDiff);
+    allDiffs.insert(partialDiff.begin(), partialDiff.end());
+    a->next = aNext;
+    b->next = bNext;
+    a = aNext;
+    b = bNext;
+    previousModuleNames.emplace_back(moduleAndNodeName.str());
+  }
 
-    return allDiffs;
+  return allDiffs;
 }
 
-map<Path, DatastoreDiff> DatastoreTransaction::diff(lllyd_node* a, lllyd_node* b) {
+map<Path, DatastoreDiff> DatastoreTransaction::diff(
+    lllyd_node* a,
+    lllyd_node* b) {
   checkIfCommitted();
   if (datastoreState->isEmpty()) {
     DatastoreException ex("Unable to diff, datastore tree does not yet exist");
     MLOG(MWARNING) << ex.what();
     throw ex;
   }
-  lllyd_difflist* difflist =
-      lllyd_diff(a, b, LLLYD_DIFFOPT_WITHDEFAULTS);
+  lllyd_difflist* difflist = lllyd_diff(a, b, LLLYD_DIFFOPT_WITHDEFAULTS);
   if (!difflist) {
     DatastoreException ex("Something went wrong, no diff possible");
     MLOG(MWARNING) << ex.what();
@@ -325,10 +342,9 @@ Optional<DiffPath> DatastoreTransaction::pickClosestPath(
 }
 
 DatastoreTransaction::~DatastoreTransaction() {
-
-    if (not hasCommited) {
-        freeRoot();
-    }
+  if (not hasCommited) {
+    freeRoot();
+  }
   datastoreState->transactionUnderway.store(false);
 }
 
@@ -440,7 +456,8 @@ dynamic DatastoreTransaction::readAlreadyCommitted(Path path) {
 }
 
 dynamic DatastoreTransaction::read(Path path, lllyd_node* node) {
-  llly_set* pSet = lllyd_find_path(node, const_cast<char*>(path.str().c_str()));
+  llly_set* pSet = findNode(node, path.str());
+  ;
 
   if (pSet == nullptr) {
     return nullptr;
@@ -500,13 +517,15 @@ bool DatastoreTransaction::isValid() {
 int DatastoreTransaction::datastoreTypeToLydOption() {
   switch (datastoreState->type) {
     case operational:
-      return LLLYD_OPT_GET | LLLYD_OPT_STRICT; // operational validation, turns off validation for
+      return LLLYD_OPT_GET |
+          LLLYD_OPT_STRICT; // operational validation, turns off validation for
       // things like mandatory nodes, leaf-refs etc.
       // because devices do not have to support all
       // mandatory nodes (like BGP) and thus would only
       // cause false validation errors
     case config:
-      return LLLYD_OPT_GETCONFIG | LLLYD_OPT_STRICT; // config validation with turned off checks
+      return LLLYD_OPT_GETCONFIG |
+          LLLYD_OPT_STRICT; // config validation with turned off checks
       // because of reasons mentioned above
   }
   return 0;
@@ -615,18 +634,32 @@ map<Path, DatastoreDiff> DatastoreTransaction::splitDiff(DatastoreDiff diff) {
   return diffs;
 }
 
-    void DatastoreTransaction::freeRoot() {
-        freeRoot(root);
-    }
+void DatastoreTransaction::freeRoot() {
+  freeRoot(root);
+}
 
-    void DatastoreTransaction::freeRoot(lllyd_node *r) {
-        lllyd_node * tmp = r;
-        while(tmp != nullptr) {
-            r = tmp;
-            r->next = nullptr;
-            lllyd_free(r);
-            tmp = tmp->next;
-        }
-    }
+void DatastoreTransaction::freeRoot(lllyd_node* r) {
+  lllyd_node* tmp = r;
+  while (tmp != nullptr) {
+    r = tmp;
+    r->next = nullptr;
+    lllyd_free(r);
+    tmp = tmp->next;
+  }
+}
+
+llly_set* DatastoreTransaction::findNode(lllyd_node* node, string path) {
+  lllyd_node* tmp = node;
+  lllyd_node* next;
+  llly_set* pSet = nullptr;
+  while (tmp != nullptr && pSet == nullptr) {
+    next = tmp->next;
+    tmp->next = nullptr;
+    pSet = lllyd_find_path(tmp, const_cast<char*>(path.c_str()));
+    tmp = next;
+  }
+
+  return pSet;
+}
 
 } // namespace devmand::channels::cli::datastore

@@ -160,7 +160,8 @@ static void parseState(
     }
   });
 
-  if (cfg->type.get() == openconfig::iana_if_type::EthernetCsmacd().to_string()) {
+  if (cfg->type.get() ==
+      openconfig::iana_if_type::EthernetCsmacd().to_string()) {
     const ReadCommand cmdStateEth =
         ReadCommand::create("show interface ethernet " + ifcId);
     string outputStateEth = channel.executeRead(cmdStateEth).get();

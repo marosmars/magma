@@ -14,9 +14,9 @@
 #include <folly/executors/thread_factory/NamedThreadFactory.h>
 #include <libssh/callbacks.h>
 #include <libssh/libssh.h>
+#include <libyang/libyang.h>
 #include <spdlog/spdlog.h>
 #include <iostream>
-#include <libyang/libyang.h>
 
 namespace devmand {
 namespace channels {

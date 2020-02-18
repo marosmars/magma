@@ -10,8 +10,9 @@
 
 namespace devmand::channels::cli::datastore {
 
-map<Path, DatastoreDiff> BindingAwareDatastoreTransaction::diff() {
-  return datastoreTransaction->diff();
+multimap<Path, DatastoreDiff> BindingAwareDatastoreTransaction::diff(
+    vector<DiffPath> registeredPaths) {
+  return datastoreTransaction->diff(registeredPaths);
 }
 
 void BindingAwareDatastoreTransaction::delete_(Path path) {
@@ -27,6 +28,7 @@ void BindingAwareDatastoreTransaction::overwrite(
 void BindingAwareDatastoreTransaction::merge(
     Path path,
     shared_ptr<Entity> entity) {
+  MLOG(MINFO) << "na zapis: " << toPrettyJson(codec->toDom(path, *entity));
   datastoreTransaction->merge(path, codec->toDom(path, *entity));
 }
 
@@ -51,5 +53,9 @@ void BindingAwareDatastoreTransaction::abort() {
 
 void BindingAwareDatastoreTransaction::print() {
   datastoreTransaction->print();
+}
+
+BindingAwareDatastoreTransaction::~BindingAwareDatastoreTransaction() {
+  datastoreTransaction->~DatastoreTransaction();
 }
 } // namespace devmand::channels::cli::datastore

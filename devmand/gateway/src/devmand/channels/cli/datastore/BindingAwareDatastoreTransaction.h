@@ -35,7 +35,7 @@ class BindingAwareDatastoreTransaction {
     const dynamic& data = datastoreTransaction->read(path);
     return std::static_pointer_cast<T>(codec->decode(toJson(data), ydkData));
   }
-  map<Path, DatastoreDiff> diff();
+  multimap<Path, DatastoreDiff> diff(vector<DiffPath> registeredPaths);
   void delete_(Path path);
   void overwrite(Path path, shared_ptr<Entity> entity);
   void merge(Path path, shared_ptr<Entity> entity);
@@ -43,6 +43,8 @@ class BindingAwareDatastoreTransaction {
   void print();
   void commit();
   void abort();
+
+  virtual ~BindingAwareDatastoreTransaction();
 };
 
 } // namespace devmand::channels::cli::datastore

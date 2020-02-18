@@ -114,13 +114,14 @@ void DatastoreTransaction::merge(const Path path, const dynamic& aDynamic) {
         next = tmp->next;
         tmp->next = nullptr;
         lllyd_merge(tmp, pNode, 0);
+        tmp->next = next;
         tmp = next;
       }
-
+      freeRoot(pNode); // TODO here better
     } else {
       root = pNode;
     }
-    freeRoot(pNode);
+    // freeRoot(pNode); //TODO probably not here
   } else {
     freeRoot();
     root = dynamic2lydNode(aDynamic);
@@ -135,6 +136,7 @@ void DatastoreTransaction::commit() {
       root); // need the real root for convenience and copy via lllyd_dup
   if (!datastoreState->isEmpty()) {
     freeRoot(datastoreState->root);
+    datastoreState->root = nullptr;
   }
   datastoreState->root = rootToBeMerged;
 
@@ -439,6 +441,8 @@ dynamic DatastoreTransaction::read(Path path) {
     return dynamic::object(); // for diffs we need an empty object
   }
 
+  // MLOG(MINFO) << "before committed: " << toPrettyJson(aDynamic);
+
   return aDynamic;
 }
 
@@ -543,7 +547,9 @@ void DatastoreTransaction::splitToMany(
     for (const auto& item : input.items()) {
       if (item.second.isArray() || item.second.isObject()) {
         string currentPath = p.str();
-        if (p.getLastSegment() !=
+        // MLOG(MINFO) << "p.getLastSegment(): " << p.getLastSegment() << "
+        // item.first.asString(): " << item.first.asString();
+        if (p.unkeyed().getLastSegment() !=
             item.first.asString()) { // TODO skip last overlapping segment name
           currentPath = p.str() + "/" + item.first.c_str();
         }
@@ -563,6 +569,7 @@ Path DatastoreTransaction::unifyLength(Path registeredPath, Path keyedPath) {
 
 multimap<Path, DatastoreDiff> DatastoreTransaction::diff(
     vector<DiffPath> registeredPaths) {
+  checkIfCommitted();
   std::set<Path> alreadyProcessedDiff;
   multimap<Path, DatastoreDiff> result;
   const map<Path, DatastoreDiff>& diffs = diff();
@@ -636,15 +643,17 @@ map<Path, DatastoreDiff> DatastoreTransaction::splitDiff(DatastoreDiff diff) {
 
 void DatastoreTransaction::freeRoot() {
   freeRoot(root);
+  root = nullptr;
 }
 
 void DatastoreTransaction::freeRoot(lllyd_node* r) {
-  lllyd_node* tmp = r;
-  while (tmp != nullptr) {
-    r = tmp;
+  lllyd_node* next = nullptr;
+  while (r != nullptr) {
+    next = r->next;
     r->next = nullptr;
     lllyd_free(r);
-    tmp = tmp->next;
+    r->next = next;
+    r = r->next;
   }
 }
 

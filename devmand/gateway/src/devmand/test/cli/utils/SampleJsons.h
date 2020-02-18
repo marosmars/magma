@@ -17,6 +17,33 @@ string statePath =
     "/openconfig-interfaces:interfaces/openconfig-interfaces:interface/openconfig-interfaces:state";
 string counterPath = statePath + "/counters";
 
+string ifaces02 =
+    "{\n"
+    "  \"openconfig-interfaces:interfaces\": {\n"
+    "    \"interface\": [\n"
+    "      {\n"
+    "        \"state\": {\n"
+    "          \"oper-status\": \"DOWN\",\n"
+    "          \"admin-status\": \"UP\",\n"
+    "          \"enabled\": true,\n"
+    "          \"description\": \"dummy state\",\n"
+    "          \"mtu\": 1518,\n"
+    "          \"type\": \"iana-if-type:ethernetCsmacd\",\n"
+    "          \"name\": \"0/2\"\n"
+    "        },\n"
+    "        \"config\": {\n"
+    "          \"enabled\": true,\n"
+    "          \"description\": \"this is a config description\",\n"
+    "          \"mtu\": 1500,\n"
+    "          \"type\": \"iana-if-type:ethernetCsmacd\",\n"
+    "          \"name\": \"0/2\"\n"
+    "        },\n"
+    "        \"name\": \"0/2\"\n"
+    "      }\n"
+    "    ]\n"
+    "  }\n"
+    "}";
+
 string openconfigInterfacesInterfaces =
     "{\n"
     "  \"openconfig-interfaces:interfaces\": {\n"

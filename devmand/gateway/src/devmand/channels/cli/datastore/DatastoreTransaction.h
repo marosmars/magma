@@ -99,11 +99,11 @@ class DatastoreTransaction {
 
  public:
   DatastoreTransaction(shared_ptr<DatastoreState> datastoreState);
-
   dynamic read(Path path);
   void print();
-  map<Path, DatastoreDiff> diff();
   multimap<Path, DatastoreDiff> diff(vector<DiffPath> registeredPaths);
+  map<Path, DatastoreDiff> diff();
+
   bool isValid();
   bool delete_(Path path);
   void merge(Path path, const dynamic& aDynamic);

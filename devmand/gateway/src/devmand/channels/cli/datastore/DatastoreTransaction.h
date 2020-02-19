@@ -96,13 +96,13 @@ class DatastoreTransaction {
   void freeRoot();
   void freeRoot(lllyd_node* r);
   llly_set* findNode(lllyd_node* node, string path);
+  map<Path, DatastoreDiff> diff();
 
  public:
   DatastoreTransaction(shared_ptr<DatastoreState> datastoreState);
   dynamic read(Path path);
   void print();
   multimap<Path, DatastoreDiff> diff(vector<DiffPath> registeredPaths);
-  map<Path, DatastoreDiff> diff();
 
   bool isValid();
   bool delete_(Path path);

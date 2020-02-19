@@ -43,6 +43,7 @@ using devmand::channels::cli::datastore::DiffPath;
 using devmand::devices::cli::BindingCodec;
 using devmand::devices::cli::SchemaContext;
 using devmand::test::utils::cli::counterPath;
+using devmand::test::utils::cli::ifaces02;
 using devmand::test::utils::cli::interface02state;
 using devmand::test::utils::cli::interface02TopPath;
 using devmand::test::utils::cli::interfaceCounters;
@@ -147,7 +148,7 @@ TEST_F(DatastoreTest, abortDisablesRunningTransaction) {
   EXPECT_THROW(transaction->delete_("/whatever"), DatastoreException);
   EXPECT_THROW(transaction->commit(), DatastoreException);
   EXPECT_THROW(transaction->isValid(), DatastoreException);
-  EXPECT_THROW(transaction->diff(), DatastoreException);
+  EXPECT_THROW(transaction->diff({}), DatastoreException);
 }
 
 TEST_F(DatastoreTest, commitDisablesRunningTransaction) {
@@ -165,7 +166,7 @@ TEST_F(DatastoreTest, commitDisablesRunningTransaction) {
   EXPECT_THROW(transaction->delete_("/whatever"), DatastoreException);
   EXPECT_THROW(transaction->commit(), DatastoreException);
   EXPECT_THROW(transaction->isValid(), DatastoreException);
-  EXPECT_THROW(transaction->diff(), DatastoreException);
+  EXPECT_THROW(transaction->diff({}), DatastoreException);
 }
 
 TEST_F(DatastoreTest, commitEndsRunningTransaction) {
@@ -202,7 +203,7 @@ TEST_F(DatastoreTest, deleteSubtrees) {
       "/openconfig-interfaces:interfaces/interface[name='0/3']";
   EXPECT_TRUE(transaction->read(interface03) != nullptr);
   transaction->delete_(interface03);
-  EXPECT_TRUE(transaction->read(interface03) == nullptr);
+  EXPECT_TRUE(toPrettyJson(transaction->read(interface03)) == "{}");
 
   transaction->abort();
 }
@@ -288,7 +289,7 @@ TEST_F(DatastoreTest, changeLeaf) {
   EXPECT_EQ(enabled["openconfig-interfaces:enabled"], false);
 }
 
-TEST_F(DatastoreTest, changeLeafDiff) {
+TEST_F(DatastoreTest, changeLeafDiff2) {
   Datastore datastore(Datastore::operational(), schemaContext);
   unique_ptr<channels::cli::datastore::DatastoreTransaction> transaction =
       datastore.newTx();
@@ -300,19 +301,42 @@ TEST_F(DatastoreTest, changeLeafDiff) {
   errors["openconfig-interfaces:counters"]["out-errors"] = "777";
   errors["openconfig-interfaces:counters"]["out-discards"] = "17";
   transaction->merge(interface02TopPath + "/state/counters", errors);
-  const map<Path, DatastoreDiff>& map = transaction->diff();
-  EXPECT_EQ(map.size(), 2);
 
-  Path outDiscards(interfaceCounters + "/openconfig-interfaces:out-discards");
-  Path outErrors(interfaceCounters + "/openconfig-interfaces:out-errors");
+  vector<DiffPath> paths;
+  Path p1(
+      "/openconfig-interfaces:interfaces/openconfig-interfaces:interface"
+      "/openconfig-interfaces:state/openconfig-interfaces:counters");
+  paths.emplace_back(p1, false);
+
+  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+
   EXPECT_EQ(
-      map.at(outDiscards).after["openconfig-interfaces:out-discards"], "17");
-  EXPECT_EQ(map.at(outErrors).after["openconfig-interfaces:out-errors"], "777");
+      multimap.begin()->first.str(),
+      "/openconfig-interfaces:interfaces/openconfig-interfaces:interface/openconfig-interfaces:state/openconfig-interfaces:counters");
   EXPECT_EQ(
-      map.at(outDiscards).before["openconfig-interfaces:out-discards"], "0");
-  EXPECT_EQ(map.at(outErrors).before["openconfig-interfaces:out-errors"], "0");
-  EXPECT_EQ(map.at(outDiscards).type, DatastoreDiffType::update);
-  EXPECT_EQ(map.at(outErrors).type, DatastoreDiffType::update);
+      multimap.begin()->second.keyedPath.str(),
+      "/openconfig-interfaces:interfaces/openconfig-interfaces:interface[name='0/2']/openconfig-interfaces:state/openconfig-interfaces:counters");
+  EXPECT_EQ(multimap.begin()->second.type, DatastoreDiffType::update);
+  EXPECT_EQ(
+      multimap.begin()
+          ->second.before["openconfig-interfaces:counters"]["out-errors"]
+          .asString(),
+      "0");
+  EXPECT_EQ(
+      multimap.begin()
+          ->second.before["openconfig-interfaces:counters"]["out-discards"]
+          .asString(),
+      "0");
+  EXPECT_EQ(
+      multimap.begin()
+          ->second.after["openconfig-interfaces:counters"]["out-errors"]
+          .asString(),
+      "777");
+  EXPECT_EQ(
+      multimap.begin()
+          ->second.after["openconfig-interfaces:counters"]["out-discards"]
+          .asString(),
+      "17");
 }
 
 TEST_F(DatastoreTest, deleteSubtreeDiff) {
@@ -326,14 +350,27 @@ TEST_F(DatastoreTest, deleteSubtreeDiff) {
   Path stateToDelete(interface02TopPath + "/state");
   transaction->delete_(stateToDelete);
 
-  const map<Path, DatastoreDiff>& map = transaction->diff();
-  EXPECT_EQ(map.size(), 1);
-  Path stateKey(
-      "/openconfig-interfaces:interfaces/openconfig-interfaces:interface/openconfig-interfaces:state");
-  EXPECT_EQ(map.begin()->first.str(), stateKey.str());
-  EXPECT_EQ(toPrettyJson(map.at(stateKey).before), interface02state);
-  EXPECT_EQ(toPrettyJson(map.at(stateKey).after), "{}");
-  EXPECT_EQ(map.at(stateKey).type, DatastoreDiffType::deleted);
+  vector<DiffPath> paths;
+  Path p1("/openconfig-interfaces:interfaces/openconfig-interfaces:interface");
+  paths.emplace_back(p1, false);
+
+  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+
+  EXPECT_EQ(
+      multimap.begin()->first.str(),
+      "/openconfig-interfaces:interfaces/openconfig-interfaces:interface");
+  EXPECT_EQ(
+      multimap.begin()->second.keyedPath.str(),
+      "/openconfig-interfaces:interfaces/openconfig-interfaces:interface[name='0/2']");
+  EXPECT_EQ(multimap.begin()->second.type, DatastoreDiffType::deleted);
+  EXPECT_EQ(
+      multimap.begin()
+          ->second.before["openconfig-interfaces:interface"][0]["state"]["name"]
+          .asString(),
+      "0/2");
+  EXPECT_ANY_THROW(
+      multimap.begin()
+          ->second.after["openconfig-interfaces:interface"][0]["state"]);
 }
 
 TEST_F(DatastoreTest, diffAfterWrite) {
@@ -347,21 +384,26 @@ TEST_F(DatastoreTest, diffAfterWrite) {
       "/openconfig-interfaces:interfaces/interface[name='0/85']";
 
   transaction->overwrite(interface85, parseJson(newInterface));
-  const map<Path, DatastoreDiff>& map = transaction->diff();
-  Path diffKey(
+
+  vector<DiffPath> paths;
+  Path p1("/openconfig-interfaces:interfaces/openconfig-interfaces:interface");
+  paths.emplace_back(p1, false);
+
+  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+
+  EXPECT_EQ(
+      multimap.begin()->first.str(),
       "/openconfig-interfaces:interfaces/openconfig-interfaces:interface");
-  EXPECT_EQ(map.size(), 1);
   EXPECT_EQ(
-      map.at(diffKey)
-          .after["openconfig-interfaces:interface"][0]["state"]["name"],
+      multimap.begin()->second.keyedPath.str(),
+      "/openconfig-interfaces:interfaces/openconfig-interfaces:interface[name='0/85']");
+  EXPECT_EQ(multimap.begin()->second.type, DatastoreDiffType::create);
+  EXPECT_EQ(
+      multimap.begin()
+          ->second.after["openconfig-interfaces:interface"][0]["name"]
+          .asString(),
       "0/85");
-  EXPECT_EQ(
-      map.at(diffKey)
-          .before["openconfig-interfaces:interfaces"]["interface"]
-          .size(),
-      3);
-  EXPECT_EQ(map.at(diffKey).type, DatastoreDiffType::create);
-  transaction->abort();
+  EXPECT_EQ(toPrettyJson(multimap.begin()->second.before), "{}");
 }
 
 TEST_F(DatastoreTest, diffAfterMerge) {
@@ -377,13 +419,30 @@ TEST_F(DatastoreTest, diffAfterMerge) {
   transaction = datastore.newTx();
   transaction->merge(newInterfaceTopPath + "/state", state);
 
-  const map<Path, DatastoreDiff>& map = transaction->diff();
-  Path diffKey(operStatus);
+  vector<DiffPath> paths;
+  Path p1(
+      "/openconfig-interfaces:interfaces/openconfig-interfaces:interface/openconfig-interfaces:state");
+  paths.emplace_back(p1, false);
+
+  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+
   EXPECT_EQ(
-      map.at(diffKey).before["openconfig-interfaces:oper-status"], "DOWN");
-  EXPECT_EQ(map.at(diffKey).after["openconfig-interfaces:oper-status"], "UP");
-  EXPECT_EQ(map.size(), 1);
-  EXPECT_EQ(map.at(diffKey).type, DatastoreDiffType::update);
+      multimap.begin()->first.str(),
+      "/openconfig-interfaces:interfaces/openconfig-interfaces:interface/openconfig-interfaces:state");
+  EXPECT_EQ(
+      multimap.begin()->second.keyedPath.str(),
+      "/openconfig-interfaces:interfaces/openconfig-interfaces:interface[name='0/85']/openconfig-interfaces:state");
+  EXPECT_EQ(multimap.begin()->second.type, DatastoreDiffType::update);
+  EXPECT_EQ(
+      multimap.begin()
+          ->second.after["openconfig-interfaces:state"]["oper-status"]
+          .asString(),
+      "UP");
+  EXPECT_EQ(
+      multimap.begin()
+          ->second.before["openconfig-interfaces:state"]["oper-status"]
+          .asString(),
+      "DOWN");
 
   transaction->abort();
 }
@@ -500,8 +559,7 @@ TEST_F(DatastoreTest, diffDeleteOperation) {
   const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
   for (const auto& multi : multimap) {
     EXPECT_EQ(p1.str(), multi.first.str());
-    EXPECT_EQ(
-        p1.str() + "/openconfig-interfaces:state", multi.second.path.str());
+    EXPECT_EQ(p1.str(), multi.second.path.str());
     EXPECT_EQ(DatastoreDiffType::deleted, multi.second.type);
   }
 }
@@ -588,9 +646,7 @@ TEST_F(DatastoreTest, diff2changes) {
           multi.second.keyedPath.str(),
           interfaceCountersWithKey + "/openconfig-interfaces:out-discards");
     } else {
-      EXPECT_EQ(
-          multi.second.keyedPath.str(),
-          interfaceCountersWithKey + "/openconfig-interfaces:out-errors");
+      EXPECT_EQ(multi.second.keyedPath.str(), interfaceCountersWithKey);
     }
 
     MLOG(MINFO) << "key: " << multi.first
@@ -633,7 +689,7 @@ TEST_F(DatastoreTest, threeIndenpendentTreesUpdateReadTest) {
   EXPECT_EQ(multimap.begin()->second.type, DatastoreDiffType::update);
 }
 
-TEST_F(DatastoreTest, threeIndenpendentTreescreateReadTest) {
+TEST_F(DatastoreTest, threeIndenpendentTreesCreateReadTest) {
   Datastore datastore(Datastore::operational(), schemaContext);
   unique_ptr<channels::cli::datastore::DatastoreTransaction> transaction =
       datastore.newTx();
@@ -644,7 +700,8 @@ TEST_F(DatastoreTest, threeIndenpendentTreescreateReadTest) {
       "/openconfig-network-instance:network-instances/network-instance[name='default']/vlans");
   dynamic vlans = transaction->read(vlanPath);
 
-  vlans["openconfig-network-instance:vlans"]["vlan"][4] = dynamic::object();
+  vlans["openconfig-network-instance:vlans"]["vlan"].push_back(
+      dynamic::object()); // [4] =;
   vlans["openconfig-network-instance:vlans"]["vlan"][4]["vlan-id"] = 666;
 
   vlans["openconfig-network-instance:vlans"]["vlan"][4]["state"] =
@@ -664,26 +721,46 @@ TEST_F(DatastoreTest, threeIndenpendentTreescreateReadTest) {
   transaction->overwrite(vlanPath, vlans);
   vector<DiffPath> paths;
   Path p1(
-      "/openconfig-network-instance:network-instances/openconfig-network-instance:network-instance"
-      "/openconfig-network-instance:vlans/openconfig-network-instance:vlan/openconfig-network-instance:state");
+      "/openconfig-network-instance:network-instances/openconfig-network-instance:network-instance/openconfig-network-instance:vlans"
+      "/openconfig-network-instance:vlan");
   paths.emplace_back(p1, false);
 
   const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
 
-  for (const auto& multi : multimap) {
-    MLOG(MINFO) << "key: " << multi.first.str()
-                << " handles:  " << multi.second.keyedPath.str();
-  }
-
-  //  EXPECT_EQ(
-  //      multimap.begin()->first.str(),
-  //      "/openconfig-network-instance:network-instances/openconfig-network-instance:network-instance"
-  //      "/openconfig-network-instance:vlans/openconfig-network-instance:vlan/openconfig-network-instance:state");
-  //  EXPECT_EQ(
-  //      multimap.begin()->second.keyedPath.str(),
-  //      "/openconfig-network-instance:network-instances/openconfig-network-instance:network-instance[name='default']/openconfig-network-instance:vlans"
-  //      "/openconfig-network-instance:vlan[vlan-id='1']/openconfig-network-instance:state");
-  //  EXPECT_EQ(multimap.begin()->second.type, DatastoreDiffType::update);
+  EXPECT_EQ(
+      multimap.begin()->first.str(),
+      "/openconfig-network-instance:network-instances/openconfig-network-instance:network-instance"
+      "/openconfig-network-instance:vlans/openconfig-network-instance:vlan");
+  EXPECT_EQ(
+      multimap.begin()->second.keyedPath.str(),
+      "/openconfig-network-instance:network-instances/openconfig-network-instance:network-instance[name='default']"
+      "/openconfig-network-instance:vlans/openconfig-network-instance:vlan[vlan-id='666']");
+  EXPECT_EQ(multimap.begin()->second.type, DatastoreDiffType::create);
+  EXPECT_EQ(
+      multimap.begin()->second.after["openconfig-network-instance:vlan"][0]
+                                    ["config"]["vlan-id"],
+      666);
+  EXPECT_EQ(
+      multimap.begin()
+          ->second
+          .after["openconfig-network-instance:vlan"][0]["config"]["status"]
+          .asString(),
+      "SUSPENDED");
+  EXPECT_EQ(
+      multimap.begin()->second.after["openconfig-network-instance:vlan"][0]
+                                    ["state"]["vlan-id"],
+      666);
+  EXPECT_EQ(
+      multimap.begin()
+          ->second
+          .after["openconfig-network-instance:vlan"][0]["state"]["status"]
+          .asString(),
+      "SUSPENDED");
+  EXPECT_EQ(
+      multimap.begin()
+          ->second.after["openconfig-network-instance:vlan"][0]["vlan-id"],
+      666);
+  EXPECT_EQ(toPrettyJson(multimap.begin()->second.before), "{}");
 }
 
 } // namespace cli

@@ -13,7 +13,6 @@
 #include <devmand/devices/cli/schema/Path.h>
 
 namespace devmand::channels::cli::datastore {
-using LeafVector = std::vector<pair<string, string>>;
 using devmand::devices::cli::BindingCodec;
 using devmand::devices::cli::Path;
 using std::unique_ptr;

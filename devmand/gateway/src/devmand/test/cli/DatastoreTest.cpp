@@ -289,7 +289,7 @@ TEST_F(DatastoreTest, changeLeaf) {
   EXPECT_EQ(enabled["openconfig-interfaces:enabled"], false);
 }
 
-TEST_F(DatastoreTest, changeLeafDiff2) {
+TEST_F(DatastoreTest, changeLeafDiff) {
   Datastore datastore(Datastore::operational(), schemaContext);
   unique_ptr<channels::cli::datastore::DatastoreTransaction> transaction =
       datastore.newTx();

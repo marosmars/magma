@@ -28,7 +28,6 @@ void BindingAwareDatastoreTransaction::overwrite(
 void BindingAwareDatastoreTransaction::merge(
     Path path,
     shared_ptr<Entity> entity) {
-  MLOG(MINFO) << "na zapis: " << toPrettyJson(codec->toDom(path, *entity));
   datastoreTransaction->merge(path, codec->toDom(path, *entity));
 }
 

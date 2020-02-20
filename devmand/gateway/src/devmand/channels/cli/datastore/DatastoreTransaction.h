@@ -24,8 +24,6 @@ using std::pair;
 using std::shared_ptr;
 using std::string;
 using ydk::Entity;
-using LeafVector = std::vector<pair<string, string>>;
-using ListKeys = std::vector<string>;
 using devmand::channels::cli::datastore::DatastoreDiff;
 using devmand::channels::cli::datastore::DatastoreDiffType;
 using devmand::channels::cli::datastore::DatastoreState;
@@ -72,7 +70,6 @@ class DatastoreTransaction {
   static lllyd_node* computeRoot(lllyd_node* n);
   int datastoreTypeToLydOption();
   lllyd_node* dynamic2lydNode(dynamic entity);
-  static void print(LeafVector& v);
   static lllyd_node*
   getExistingNode(lllyd_node* a, lllyd_node* b, DatastoreDiffType type);
   static void printDiffType(LLLYD_DIFFTYPE type);

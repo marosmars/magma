@@ -487,12 +487,6 @@ dynamic DatastoreTransaction::read(Path path, lllyd_node* node) {
   return parseJson(json);
 }
 
-void DatastoreTransaction::print(LeafVector& v) {
-  for (const auto& item : v) {
-    MLOG(MINFO) << "full path: " << item.first << " data: " << item.second;
-  }
-}
-
 lllyd_node* DatastoreTransaction::getExistingNode(
     lllyd_node* a,
     lllyd_node* b,

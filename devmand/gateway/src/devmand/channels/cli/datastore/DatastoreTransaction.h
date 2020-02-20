@@ -77,11 +77,15 @@ class DatastoreTransaction {
   static void addKeysToPath(lllyd_node* node, std::stringstream& path);
   static dynamic appendAllParents(Path path, const dynamic& aDynamic);
   static Path unifyLength(Path registeredPath, Path keyedPath);
-  Optional<DiffPath> pickClosestPath(Path, vector<DiffPath> paths);
+  vector<DiffPath>
+  pickClosestPath(Path, vector<DiffPath> paths, DatastoreDiffType type);
   map<Path, DatastoreDiff> splitDiff(DatastoreDiff diff);
   void
   splitToMany(Path p, dynamic input, vector<std::pair<string, dynamic>>& v);
-  Optional<Path> getRegisteredPath(vector<DiffPath> registeredPaths, Path path);
+  vector<Path> getRegisteredPath(
+      vector<DiffPath> registeredPaths,
+      Path path,
+      DatastoreDiffType type);
   dynamic read(Path path, lllyd_node* node);
   dynamic readAlreadyCommitted(Path path);
   map<Path, DatastoreDiff> diff(lllyd_node* a, lllyd_node* b);

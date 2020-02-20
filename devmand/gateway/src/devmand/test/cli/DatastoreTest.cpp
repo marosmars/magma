@@ -375,6 +375,47 @@ TEST_F(DatastoreTest, deleteSubtreeDiff) {
           ->second.after["openconfig-interfaces:interface"][0]["state"]);
 }
 
+TEST_F(DatastoreTest, deleteSubtreeDiff2) {
+  Datastore datastore(Datastore::operational(), schemaContext);
+  unique_ptr<channels::cli::datastore::DatastoreTransaction> transaction =
+      datastore.newTx();
+  transaction->overwrite(Path("/"), parseJson(openconfigInterfacesInterfaces));
+
+  transaction->commit();
+  transaction = datastore.newTx();
+  transaction->delete_(interface02TopPath);
+
+  vector<DiffPath> paths;
+  Path p1(
+      "/openconfig-interfaces:interfaces/openconfig-interfaces:interface/state");
+  paths.emplace_back(p1, false);
+
+  const std::multimap<Path, DatastoreDiff>& multimaps =
+      transaction->diff(paths).diffs;
+
+  for (const auto& item : multimaps) {
+    MLOG(MINFO) << "{ " << item.second.type
+                << " } registrovany pre: " << item.first.str()
+                << " zmena bola: " << item.second.keyedPath.str();
+  }
+
+  //            EXPECT_EQ(
+  //                    multimap.begin()->first.str(),
+  //                    "/openconfig-interfaces:interfaces/openconfig-interfaces:interface");
+  //            EXPECT_EQ(
+  //                    multimap.begin()->second.keyedPath.str(),
+  //                    "/openconfig-interfaces:interfaces/openconfig-interfaces:interface[name='0/2']");
+  //            EXPECT_EQ(multimap.begin()->second.type,
+  //            DatastoreDiffType::deleted); EXPECT_EQ(
+  //                    multimap.begin()
+  //                            ->second.before["openconfig-interfaces:interface"][0]["state"]["name"]
+  //                            .asString(),
+  //                    "0/2");
+  //            EXPECT_ANY_THROW(
+  //                    multimap.begin()
+  //                            ->second.after["openconfig-interfaces:interface"][0]["state"]);
+}
+
 TEST_F(DatastoreTest, diffAfterWrite) {
   Datastore datastore(Datastore::operational(), schemaContext);
   unique_ptr<channels::cli::datastore::DatastoreTransaction> transaction =

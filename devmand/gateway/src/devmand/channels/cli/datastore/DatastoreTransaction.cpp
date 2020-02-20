@@ -292,47 +292,66 @@ map<Path, DatastoreDiff> DatastoreTransaction::diff(
   return diffs;
 }
 
-Optional<Path> DatastoreTransaction::getRegisteredPath(
+vector<Path> DatastoreTransaction::getRegisteredPath(
     vector<DiffPath> registeredPaths,
-    Path path) {
-  const Optional<DiffPath>& registeredParentOptional =
-      pickClosestPath(path, registeredPaths);
-  if (registeredParentOptional) {
-    DiffPath registeredParent = registeredParentOptional.value();
-    if (registeredParent.asterix ||
-        path.getSegments().size() ==
-            (registeredParent.path.getSegments().size() + 1) ||
-        path.getSegments().size() ==
-            registeredParent.path.getSegments().size()) {
-      return make_optional(registeredParent.path);
-    } else {
-      MLOG(MINFO) << "seg diff: " << path.getSegments().size()
-                  << " seg reg: " << registeredParent.path.getSegments().size()
-                  << " Unhandled event for " << registeredParent.path.str()
-                  << " changed path: " << path.str();
-    }
-  } else {
+    Path path,
+    DatastoreDiffType type) {
+  vector<Path> result;
+  const vector<DiffPath> registeredParentsToNotify =
+      pickClosestPath(path, registeredPaths, type);
+
+  if (registeredParentsToNotify.empty()) {
     MLOG(MINFO) << "Unhandled event for changed path: " << path.str();
   }
 
-  return none;
+  for (const auto& parentsToNotify : registeredParentsToNotify) {
+    if (parentsToNotify.asterix ||
+        path.getSegments().size() ==
+            (parentsToNotify.path.getSegments().size() + 1) ||
+        path.getSegments().size() ==
+            parentsToNotify.path.getSegments().size()) {
+      result.emplace_back(parentsToNotify.path);
+    } else {
+      MLOG(MINFO) << "seg diff: " << path.getSegments().size()
+                  << " seg reg: " << parentsToNotify.path.getSegments().size()
+                  << " Unhandled event for " << parentsToNotify.path.str()
+                  << " changed path: " << path.str();
+    }
+  }
+
+  return result;
 }
 
-Optional<DiffPath> DatastoreTransaction::pickClosestPath(
+vector<DiffPath> DatastoreTransaction::pickClosestPath(
     Path path,
-    vector<DiffPath> paths) {
+    vector<DiffPath> paths,
+    DatastoreDiffType type) {
+  vector<DiffPath> result;
+
+  if (type == DatastoreDiffType::deleted) {
+    for (auto registeredPath : paths) {
+      if (registeredPath.path.isChildOf(path)) {
+        registeredPath.asterix = true;
+        result.emplace_back(registeredPath);
+      }
+    }
+  }
+
   unsigned int max = 0;
-  DiffPath result;
+  DiffPath resultSoFar;
   bool found = false;
   for (const auto& p : paths) {
     if (path.segmentDistance(p.path) > max && path.isChildOf(p.path)) {
-      result = p;
+      resultSoFar = p;
       max = path.segmentDistance(p.path);
       found = true;
     }
   }
+  if (found) {
+    result.emplace_back(resultSoFar);
+  }
 
-  return found ? make_optional(result) : none;
+  return result;
 }
 
 DatastoreTransaction::~DatastoreTransaction() {
@@ -499,6 +518,7 @@ bool DatastoreTransaction::isValid() {
   }
 
   lllyd_node* tmp = root;
+  lllyd_node* next = nullptr;
   bool isValid = true;
   while (tmp != nullptr) {
     next = tmp->next;
@@ -552,12 +572,16 @@ void DatastoreTransaction::splitToMany(
   }
 }
 
-Path DatastoreTransaction::unifyLength(Path registeredPath, Path keyedPath) {
-  while (keyedPath.getDepth() != registeredPath.getDepth()) {
-    keyedPath = keyedPath.getParent();
-  }
-  return keyedPath;
-}
+    Path DatastoreTransaction::unifyLength(Path registeredPath, Path keyedPath) {
+        if(keyedPath.getDepth() <= registeredPath.getDepth()){
+            return keyedPath;
+        }
+
+        while (keyedPath.getDepth() != registeredPath.getDepth()) {
+            keyedPath = keyedPath.getParent();
+        }
+        return keyedPath;
+    }
 
 DiffResult DatastoreTransaction::diff(vector<DiffPath> registeredPaths) {
   checkIfCommitted();
@@ -569,12 +593,19 @@ DiffResult DatastoreTransaction::diff(vector<DiffPath> registeredPaths) {
         splitDiff(diffItem.second); // split them to smaller ones
     for (const auto& smallerDiffsItem :
          smallerDiffs) { // map the smaller ones to their registered path
-      Optional<Path> registeredPath =
-          getRegisteredPath(registeredPaths, smallerDiffsItem.first);
-      if (registeredPath) {
-        // this is the registered path provided by the handlers
-        Path registeredPathHandlingDiff = registeredPath.value();
-        // we need a keyed path to read before and after state for the handlers
+      vector<Path> registeredPathsToNotify = getRegisteredPath(
+          registeredPaths,
+          smallerDiffsItem.first,
+          smallerDiffsItem.second.type);
+
+      if (registeredPathsToNotify.empty()) {
+        result.appendUnhandledPath(smallerDiffsItem.first);
+      }
+
+      // this is the registered path provided by the handlers
+      for (const auto& registeredPathHandlingDiff : registeredPathsToNotify) {
+        // we need a keyed path to read before and after state for the
+        // handlers
         Path pathForReadingBeforeAfter = unifyLength(
             registeredPathHandlingDiff, smallerDiffsItem.second.keyedPath);
         if (not alreadyProcessedDiff.count(
@@ -590,17 +621,14 @@ DiffResult DatastoreTransaction::diff(vector<DiffPath> registeredPaths) {
         result.diffs.emplace(std::make_pair(
             registeredPathHandlingDiff,
             DatastoreDiff(
-                // we read what the state was before (no just the change but the
-                // whole
-                // subtree under the registered path)
+                // we read what the state was before (no just the change but
+                // the whole subtree under the registered path)
                 readAlreadyCommitted(pathForReadingBeforeAfter),
                 // we read what is there now (no just the change but the whole
                 // subtree under the registered path)
                 read(pathForReadingBeforeAfter),
                 smallerDiffsItem.second.type, // we keep the type of change
                 pathForReadingBeforeAfter)));
-      } else {
-        result.appendUnhandledPath(smallerDiffsItem.first);
       }
     }
   }

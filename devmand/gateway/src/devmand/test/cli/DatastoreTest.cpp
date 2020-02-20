@@ -308,7 +308,8 @@ TEST_F(DatastoreTest, changeLeafDiff) {
       "/openconfig-interfaces:state/openconfig-interfaces:counters");
   paths.emplace_back(p1, false);
 
-  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+  const std::multimap<Path, DatastoreDiff>& multimap =
+      transaction->diff(paths).diffs;
 
   EXPECT_EQ(
       multimap.begin()->first.str(),
@@ -354,7 +355,8 @@ TEST_F(DatastoreTest, deleteSubtreeDiff) {
   Path p1("/openconfig-interfaces:interfaces/openconfig-interfaces:interface");
   paths.emplace_back(p1, false);
 
-  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+  const std::multimap<Path, DatastoreDiff>& multimap =
+      transaction->diff(paths).diffs;
 
   EXPECT_EQ(
       multimap.begin()->first.str(),
@@ -389,7 +391,8 @@ TEST_F(DatastoreTest, diffAfterWrite) {
   Path p1("/openconfig-interfaces:interfaces/openconfig-interfaces:interface");
   paths.emplace_back(p1, false);
 
-  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+  const std::multimap<Path, DatastoreDiff>& multimap =
+      transaction->diff(paths).diffs;
 
   EXPECT_EQ(
       multimap.begin()->first.str(),
@@ -424,7 +427,8 @@ TEST_F(DatastoreTest, diffAfterMerge) {
       "/openconfig-interfaces:interfaces/openconfig-interfaces:interface/openconfig-interfaces:state");
   paths.emplace_back(p1, false);
 
-  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+  const std::multimap<Path, DatastoreDiff>& multimap =
+      transaction->diff(paths).diffs;
 
   EXPECT_EQ(
       multimap.begin()->first.str(),
@@ -528,7 +532,8 @@ TEST_F(DatastoreTest, diffMultipleOperations) {
   paths.emplace_back(p1, false);
   paths.emplace_back(p2, false);
 
-  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+  const std::multimap<Path, DatastoreDiff>& multimap =
+      transaction->diff(paths).diffs;
 
   auto it = multimap.equal_range(statePath.c_str());
 
@@ -556,7 +561,8 @@ TEST_F(DatastoreTest, diffDeleteOperation) {
   Path p1("/openconfig-interfaces:interfaces/openconfig-interfaces:interface");
   paths.emplace_back(p1, false);
 
-  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+  const std::multimap<Path, DatastoreDiff>& multimap =
+      transaction->diff(paths).diffs;
   for (const auto& multi : multimap) {
     EXPECT_EQ(p1.str(), multi.first.str());
     EXPECT_EQ(p1.str(), multi.second.path.str());
@@ -580,7 +586,8 @@ TEST_F(DatastoreTest, twoIdenpendentTreesDiffUpdateTest) {
       "/openconfig-interfaces:interfaces/openconfig-interfaces:interface/openconfig-interfaces:config");
   paths.emplace_back(p1, true);
 
-  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+  const std::multimap<Path, DatastoreDiff>& multimap =
+      transaction->diff(paths).diffs;
   for (const auto& multi : multimap) {
     MLOG(MINFO) << "key: " << multi.first.str()
                 << " handles:  " << multi.second.keyedPath.str();
@@ -610,7 +617,8 @@ TEST_F(DatastoreTest, threeIndenpendentTreesDiffDeleteTest) {
       "/openconfig-network-instance:network-instances/openconfig-network-instance:network-instance");
   paths.emplace_back(p1, false);
 
-  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+  const std::multimap<Path, DatastoreDiff>& multimap =
+      transaction->diff(paths).diffs;
 
   EXPECT_EQ(
       multimap.begin()->first.str(),
@@ -637,7 +645,7 @@ TEST_F(DatastoreTest, diff2changes) {
   vector<DiffPath> paths;
   paths.emplace_back(Path(interfaceCounters), false);
   const std::multimap<Path, DatastoreDiff>& multimap =
-      transaction2->diff(paths);
+      transaction2->diff(paths).diffs;
   for (const auto& multi : multimap) {
     EXPECT_EQ(multi.first.str(), interfaceCounters);
     if (interfaceCountersWithKey + "/openconfig-interfaces:out-discards" ==
@@ -676,7 +684,8 @@ TEST_F(DatastoreTest, threeIndenpendentTreesUpdateReadTest) {
       "/openconfig-network-instance:vlans/openconfig-network-instance:vlan/openconfig-network-instance:state");
   paths.emplace_back(p1, false);
 
-  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+  const std::multimap<Path, DatastoreDiff>& multimap =
+      transaction->diff(paths).diffs;
 
   EXPECT_EQ(
       multimap.begin()->first.str(),
@@ -725,7 +734,8 @@ TEST_F(DatastoreTest, threeIndenpendentTreesCreateReadTest) {
       "/openconfig-network-instance:vlan");
   paths.emplace_back(p1, false);
 
-  const std::multimap<Path, DatastoreDiff>& multimap = transaction->diff(paths);
+  const std::multimap<Path, DatastoreDiff>& multimap =
+      transaction->diff(paths).diffs;
 
   EXPECT_EQ(
       multimap.begin()->first.str(),

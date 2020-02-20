@@ -102,28 +102,22 @@ dynamic DatastoreTransaction::appendAllParents(
 
 void DatastoreTransaction::merge(const Path path, const dynamic& aDynamic) {
   checkIfCommitted();
-  if (path.str() != path.PATH_SEPARATOR) {
-    dynamic withParents = appendAllParents(path, aDynamic);
-    lllyd_node* pNode = dynamic2lydNode(withParents);
+  dynamic withParents = appendAllParents(path, aDynamic);
+  lllyd_node* pNode = dynamic2lydNode(withParents);
 
-    if (root != nullptr) { // there exists something to merge to
-      lllyd_node* tmp = root;
-      lllyd_node* next;
-      while (tmp != nullptr) {
-        next = tmp->next;
-        tmp->next = nullptr;
-        lllyd_merge(tmp, pNode, 0);
-        tmp->next = next;
-        tmp = next;
-      }
-      freeRoot(pNode); // TODO here better
-    } else {
-      root = pNode;
-    }
-    // freeRoot(pNode); //TODO probably not here
+  if (root == nullptr) {
+    root = pNode;
   } else {
-    freeRoot();
-    root = dynamic2lydNode(aDynamic);
+    lllyd_node* tmp = root;
+    lllyd_node* next;
+    while (tmp != nullptr) {
+      next = tmp->next;
+      tmp->next = nullptr;
+      lllyd_merge(tmp, pNode, 0);
+      tmp->next = next;
+      tmp = next;
+    }
+    freeRoot(pNode);
   }
 }
 
@@ -503,7 +497,19 @@ bool DatastoreTransaction::isValid() {
     MLOG(MWARNING) << ex.what();
     throw ex;
   }
-  return lllyd_validate(&root, datastoreTypeToLydOption(), nullptr) == 0;
+
+  lllyd_node* tmp = root;
+  bool isValid = true;
+  while (tmp != nullptr) {
+    next = tmp->next;
+    tmp->next = nullptr;
+    isValid = isValid &&
+        (lllyd_validate(&tmp, datastoreTypeToLydOption(), nullptr) == 0);
+    tmp->next = next;
+    tmp = next;
+  }
+
+  return isValid;
 }
 
 int DatastoreTransaction::datastoreTypeToLydOption() {
@@ -553,11 +559,10 @@ Path DatastoreTransaction::unifyLength(Path registeredPath, Path keyedPath) {
   return keyedPath;
 }
 
-multimap<Path, DatastoreDiff> DatastoreTransaction::diff(
-    vector<DiffPath> registeredPaths) {
+DiffResult DatastoreTransaction::diff(vector<DiffPath> registeredPaths) {
   checkIfCommitted();
+  DiffResult result;
   std::set<Path> alreadyProcessedDiff;
-  multimap<Path, DatastoreDiff> result;
   const map<Path, DatastoreDiff>& diffs = diff();
   for (const auto& diffItem : diffs) { // take libyang diffs
     const map<Path, DatastoreDiff>& smallerDiffs =
@@ -582,7 +587,7 @@ multimap<Path, DatastoreDiff> DatastoreTransaction::diff(
         } else {
           continue;
         }
-        result.emplace(std::make_pair(
+        result.diffs.emplace(std::make_pair(
             registeredPathHandlingDiff,
             DatastoreDiff(
                 // we read what the state was before (no just the change but the
@@ -595,7 +600,7 @@ multimap<Path, DatastoreDiff> DatastoreTransaction::diff(
                 smallerDiffsItem.second.type, // we keep the type of change
                 pathForReadingBeforeAfter)));
       } else {
-        // TODO no registered paths for occured event
+        result.appendUnhandledPath(smallerDiffsItem.first);
       }
     }
   }

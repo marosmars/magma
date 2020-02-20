@@ -55,10 +55,6 @@ struct DiffResult {
   void appendUnhandledPath(Path pathToAppend) {
     unhandledDiffs.emplace_back(pathToAppend);
   }
-  DiffResult(
-      const multimap<Path, DatastoreDiff>& _diffs,
-      const vector<Path>& _unhandledDiffs)
-      : diffs(_diffs), unhandledDiffs(_unhandledDiffs) {}
 };
 
 class DatastoreTransaction {
@@ -99,7 +95,7 @@ class DatastoreTransaction {
   DatastoreTransaction(shared_ptr<DatastoreState> datastoreState);
   dynamic read(Path path);
   void print();
-  multimap<Path, DatastoreDiff> diff(vector<DiffPath> registeredPaths);
+  DiffResult diff(vector<DiffPath> registeredPaths);
 
   bool isValid();
   bool delete_(Path path);

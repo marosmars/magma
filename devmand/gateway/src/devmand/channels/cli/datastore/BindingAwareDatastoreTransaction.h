@@ -34,7 +34,7 @@ class BindingAwareDatastoreTransaction {
     const dynamic& data = datastoreTransaction->read(path);
     return std::static_pointer_cast<T>(codec->decode(toJson(data), ydkData));
   }
-  multimap<Path, DatastoreDiff> diff(vector<DiffPath> registeredPaths);
+  DiffResult diff(vector<DiffPath> registeredPaths);
   void delete_(Path path);
   void overwrite(Path path, shared_ptr<Entity> entity);
   void merge(Path path, shared_ptr<Entity> entity);

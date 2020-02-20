@@ -10,7 +10,7 @@
 
 namespace devmand::channels::cli::datastore {
 
-multimap<Path, DatastoreDiff> BindingAwareDatastoreTransaction::diff(
+DiffResult BindingAwareDatastoreTransaction::diff(
     vector<DiffPath> registeredPaths) {
   return datastoreTransaction->diff(registeredPaths);
 }

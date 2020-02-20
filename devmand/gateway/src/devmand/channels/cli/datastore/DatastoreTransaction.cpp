@@ -26,16 +26,16 @@ bool DatastoreTransaction::delete_(Path p) {
     return false;
   }
 
-  llly_set* pSet = findNode(root, p.str());
-  //  lllyd_node* tmp = root;
-  //  lllyd_node* next;
-  //   nullptr;
-  //  while (tmp != nullptr && pSet == nullptr) {
-  //    next = tmp->next;
-  //    tmp->next = nullptr;
-  //    pSet = lllyd_find_path(tmp, const_cast<char*>(path.c_str()));
-  //    tmp = next;
-  //  }
+  lllyd_node* tmp = root;
+  lllyd_node* next = nullptr;
+  llly_set* pSet = nullptr;
+  while (tmp != nullptr && pSet == nullptr) {
+    next = tmp->next;
+    tmp->next = nullptr;
+    pSet = lllyd_find_path(tmp, const_cast<char*>(path.c_str()));
+    tmp->next = next;
+    tmp = next;
+  }
 
   if (pSet == nullptr) {
     MLOG(MDEBUG) << "Nothing to delete, " + path + " not found";
@@ -53,7 +53,6 @@ bool DatastoreTransaction::delete_(Path p) {
 void DatastoreTransaction::overwrite(Path path, const dynamic& aDynamic) {
   delete_(path);
   merge(path, aDynamic);
-  // print(root);
 }
 
 lllyd_node* DatastoreTransaction::dynamic2lydNode(dynamic entity) {
@@ -142,7 +141,6 @@ void DatastoreTransaction::commit() {
 
   hasCommited.store(true);
   datastoreState->transactionUnderway.store(false);
-  //  print(datastoreState->root);
 }
 
 void DatastoreTransaction::abort() {
@@ -440,9 +438,6 @@ dynamic DatastoreTransaction::read(Path path) {
   if (aDynamic == nullptr) {
     return dynamic::object(); // for diffs we need an empty object
   }
-
-  // MLOG(MINFO) << "before committed: " << toPrettyJson(aDynamic);
-
   return aDynamic;
 }
 
@@ -461,7 +456,6 @@ dynamic DatastoreTransaction::readAlreadyCommitted(Path path) {
 
 dynamic DatastoreTransaction::read(Path path, lllyd_node* node) {
   llly_set* pSet = findNode(node, path.str());
-  ;
 
   if (pSet == nullptr) {
     return nullptr;
@@ -541,8 +535,6 @@ void DatastoreTransaction::splitToMany(
     for (const auto& item : input.items()) {
       if (item.second.isArray() || item.second.isObject()) {
         string currentPath = p.str();
-        // MLOG(MINFO) << "p.getLastSegment(): " << p.getLastSegment() << "
-        // item.first.asString(): " << item.first.asString();
         if (p.unkeyed().getLastSegment() !=
             item.first.asString()) { // TODO skip last overlapping segment name
           currentPath = p.str() + "/" + item.first.c_str();

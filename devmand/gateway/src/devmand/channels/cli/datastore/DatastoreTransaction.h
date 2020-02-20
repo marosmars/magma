@@ -18,12 +18,6 @@
 #include <ydk/types.hpp>
 #include <atomic>
 
-using std::make_shared;
-using std::map;
-using std::pair;
-using std::shared_ptr;
-using std::string;
-using ydk::Entity;
 using devmand::channels::cli::datastore::DatastoreDiff;
 using devmand::channels::cli::datastore::DatastoreDiffType;
 using devmand::channels::cli::datastore::DatastoreState;
@@ -34,9 +28,15 @@ using folly::dynamic;
 using folly::Optional;
 using folly::parseJson;
 using std::atomic_bool;
+using std::make_shared;
+using std::map;
 using std::multimap;
+using std::pair;
 using std::runtime_error;
+using std::shared_ptr;
+using std::string;
 using std::vector;
+using ydk::Entity;
 
 namespace devmand::channels::cli::datastore {
 

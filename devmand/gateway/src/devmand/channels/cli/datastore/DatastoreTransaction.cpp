@@ -26,6 +26,11 @@ bool DatastoreTransaction::delete_(Path p) {
     return false;
   }
 
+    if(Path::ROOT == p || p.getDepth() == 1) { //TODO SOLVE FOR MULTITREE p.getDepth() == 1
+        freeRoot();
+        return true;
+    }
+
   lllyd_node* tmp = root;
   lllyd_node* next = nullptr;
   llly_set* pSet = nullptr;
@@ -44,7 +49,7 @@ bool DatastoreTransaction::delete_(Path p) {
     MLOG(MDEBUG) << "Deleting " << pSet->number << " subtrees";
   }
   for (unsigned int j = 0; j < pSet->number; ++j) {
-    lllyd_free(pSet->set.d[j]);
+     freeRoot(pSet->set.d[j]);
   }
   llly_set_free(pSet);
   return true;
@@ -217,6 +222,15 @@ map<Path, DatastoreDiff> DatastoreTransaction::diff() {
   map<Path, DatastoreDiff> allDiffs;
   lllyd_node* a = datastoreState->root;
   lllyd_node* b = root;
+
+  //create/delete root elementu => datastoreState->root alebo root budu NULL
+  if( b == nullptr ) { //todo toto je delete rootu (este chyba create)
+      Path rootPath = Path("/" + string(datastoreState->root->schema->name));
+      DatastoreDiff datastoreDiff(readAlreadyCommitted(rootPath), dynamic::object(), DatastoreDiffType::deleted, rootPath);
+      allDiffs.emplace(rootPath, datastoreDiff);
+      return allDiffs;
+  }
+
   vector<string> previousModuleNames;
   while (a != nullptr && b != nullptr) {
     lllyd_node* aNext = a->next;
@@ -423,6 +437,49 @@ string DatastoreTransaction::buildFullPath(lllyd_node* node, string pathSoFar) {
   return buildFullPath(node->parent, path.str());
 }
 
+//TODO toto je len tak
+    string DatastoreTransaction::appendToPath(lllyd_node* node, string pathSoFar) {
+
+        llly_set* pSet = findNode(node, pathSoFar);
+
+        if (pSet == nullptr) {
+            return nullptr;
+        }
+
+        if (pSet->number == 0) {
+            llly_set_free(pSet);
+            return nullptr;
+        }
+
+        if (pSet->number > 1) {
+            llly_set_free(pSet);
+
+            DatastoreException ex(
+                    "Too many results from path: " + path.str() +
+                    " , query must target a unique element");
+            MLOG(MWARNING) << ex.what();
+            throw ex;
+        }
+
+        const string& json = toJson(pSet->set.d[0]);
+        llly_set_free(pSet);
+        return parseJson(json);
+
+
+
+        std::stringstream path;
+        path << "/" << node->schema->module->name << ":" << node->schema->name;
+        if (node->schema->nodetype == LLLYS_LIST) {
+            addKeysToPath(node, path);
+        }
+        path << pathSoFar;
+        if (node->parent == nullptr) {
+            return path.str();
+        }
+        return buildFullPath(node->parent, path.str());
+    }
+
+
 void DatastoreTransaction::printDiffType(LLLYD_DIFFTYPE type) {
   switch (type) {
     case LLLYD_DIFF_DELETED:
@@ -493,6 +550,9 @@ dynamic DatastoreTransaction::read(Path path, lllyd_node* node) {
   llly_set_free(pSet);
   return parseJson(json);
 }
+
+
+
 
 lllyd_node* DatastoreTransaction::getExistingNode(
     lllyd_node* a,
@@ -572,16 +632,16 @@ void DatastoreTransaction::splitToMany(
   }
 }
 
-    Path DatastoreTransaction::unifyLength(Path registeredPath, Path keyedPath) {
-        if(keyedPath.getDepth() <= registeredPath.getDepth()){
-            return keyedPath;
-        }
+Path DatastoreTransaction::unifyLength(Path registeredPath, Path keyedPath) {
+  if (keyedPath.getDepth() <= registeredPath.getDepth()) {
+    return keyedPath;
+  }
 
-        while (keyedPath.getDepth() != registeredPath.getDepth()) {
-            keyedPath = keyedPath.getParent();
-        }
-        return keyedPath;
-    }
+  while (keyedPath.getDepth() != registeredPath.getDepth()) {
+    keyedPath = keyedPath.getParent();
+  }
+  return keyedPath;
+}
 
 DiffResult DatastoreTransaction::diff(vector<DiffPath> registeredPaths) {
   checkIfCommitted();
@@ -689,5 +749,9 @@ llly_set* DatastoreTransaction::findNode(lllyd_node* node, string path) {
 
   return pSet;
 }
+
+    lllyd_node *DatastoreTransaction::find(dynamic entity) {
+        return nullptr;
+    }
 
 } // namespace devmand::channels::cli::datastore

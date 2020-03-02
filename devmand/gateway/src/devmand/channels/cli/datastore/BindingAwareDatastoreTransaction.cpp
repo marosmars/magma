@@ -10,8 +10,9 @@
 
 namespace devmand::channels::cli::datastore {
 
-map<Path, DatastoreDiff> BindingAwareDatastoreTransaction::diff() {
-  return datastoreTransaction->diff();
+DiffResult BindingAwareDatastoreTransaction::diff(
+    vector<DiffPath> registeredPaths) {
+  return datastoreTransaction->diff(registeredPaths);
 }
 
 void BindingAwareDatastoreTransaction::delete_(Path path) {
@@ -52,4 +53,5 @@ void BindingAwareDatastoreTransaction::abort() {
 void BindingAwareDatastoreTransaction::print() {
   datastoreTransaction->print();
 }
+
 } // namespace devmand::channels::cli::datastore

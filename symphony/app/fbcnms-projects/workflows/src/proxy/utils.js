@@ -22,10 +22,10 @@ export const GLOBAL_PREFIX = 'GLOBAL';
 export const INFIX_SEPARATOR = '___';
 
 const SYSTEM_TASK_TYPES = [
+  'SUB_WORKFLOW',
   'DECISION',
   'EVENT',
   'HTTP',
-  'SUB_WORKFLOW',
   'FORK',
   'FORK_JOIN_DYNAMIC',
   'JOIN',
@@ -40,6 +40,10 @@ const SYSTEM_TASK_TYPES = [
 
 export function isAllowedSystemTask(task) {
   return SYSTEM_TASK_TYPES.includes(task.type);
+}
+
+export function isSubworkflowTask(task) {
+  return SYSTEM_TASK_TYPES[0] === task.type;
 }
 
 export function withUnderscore(s) {

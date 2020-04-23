@@ -19,6 +19,7 @@ import {
   createProxyOptionsBuffer,
   isAllowedSystemTask,
   withUnderscore,
+  isSubworkflowTask,
 } from '../utils.js';
 
 const logger = logging.getLogger(module);
@@ -61,6 +62,13 @@ function sanitizeWorkflowdefBefore(tenantId, workflowdef) {
   // add prefix to tasks
   for (const task of workflowdef.tasks) {
     task.name = tenantWithUnderscore + task.name;
+
+    // add prefix to SUB_WORKFLOW tasks' referenced workflows
+    if (isSubworkflowTask(task)) {
+      if (task.subWorkflowParam?.name) {
+        task.subWorkflowParam.name = tenantWithUnderscore + task.subWorkflowParam.name
+      }
+    }
   }
   // add prefix to workflow
   workflowdef.name = tenantWithUnderscore + workflowdef.name;
@@ -75,7 +83,15 @@ function sanitizeWorkflowdefAfter(tenantId, workflowdef) {
   if (workflowdef.name.indexOf(tenantWithUnderscore) == 0) {
     // keep only workflows with correct taskdefs,
     // allowed are GLOBAL and those with tenantId prefix which will be removed
+
     for (const task of workflowdef.tasks) {
+      // remove prefix from SUB_WORKFLOW tasks' referenced workflows
+      if (isSubworkflowTask(task)) {
+        if (task.subWorkflowParam?.name) {
+          task.subWorkflowParam.name = task.subWorkflowParam.name.substr(tenantWithUnderscore.length)
+        }
+      }
+
       if (task.name.indexOf(withUnderscore(GLOBAL_PREFIX)) == 0) {
         // noop
       } else if (task.name.indexOf(tenantWithUnderscore) == 0) {

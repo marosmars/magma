@@ -21,6 +21,7 @@ export const GLOBAL_PREFIX = 'GLOBAL';
 export const INFIX_SEPARATOR = '___';
 
 const SUB_WORKFLOW = 'SUB_WORKFLOW';
+const DECISION = 'DECISION';
 const SYSTEM_TASK_TYPES = [
   SUB_WORKFLOW,
   'DECISION',
@@ -45,6 +46,9 @@ function isAllowedSystemTask(task) {
 export function isSubworkflowTask(task) {
   return SUB_WORKFLOW === task.type;
 }
+export function isDecisionTask(task) {
+  return DECISION === task.type;
+}
 
 export function assertAllowedSystemTask(task) {
   if (!isAllowedSystemTask(task)) {
@@ -53,6 +57,21 @@ export function assertAllowedSystemTask(task) {
     );
     // TODO create Exception class
     throw 'Task type is not allowed';
+  }
+
+  // assert decisions recursively
+  if (isDecisionTask(task)) {
+    const defaultCaseTasks = task.defaultCase ? task.defaultCase : [];
+    for (const task of defaultCaseTasks) {
+      assertAllowedSystemTask(task);
+    }
+
+    const decisionCaseIdToTasks = task.decisionCases ? task.decisionCases : {};
+    for (const tasks of Object.values(decisionCaseIdToTasks)) {
+      for (const task of defaultCaseTasks) {
+        assertAllowedSystemTask(task);
+      }
+    }
   }
 }
 
@@ -124,6 +143,14 @@ export function removeTenantPrefix(tenantId, json, jsonPath, allowGlobal) {
     }
     // expect tenantId prefix
     if (prop.indexOf(tenantWithInfixSeparator) != 0) {
+
+      if (jsonPath.indexOf("taskDefName") != -1) {
+        // Skipping tenant removal in taskDefName
+        //  This is expected as some tasks do not require task def
+        //  and might contain just some default
+        continue;
+      }
+
       logger.error(
         `Name must start with tenantId prefix` +
           `tenantId:'${tenantId}',json:'${json}',jsonPath:'${jsonPath}'` +

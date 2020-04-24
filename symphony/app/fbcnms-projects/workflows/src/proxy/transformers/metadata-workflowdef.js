@@ -18,6 +18,7 @@ import {
   assertAllowedSystemTask,
   createProxyOptionsBuffer,
   isSubworkflowTask,
+  isDecisionTask,
   withInfixSeparator,
 } from '../utils.js';
 
@@ -33,17 +34,35 @@ function sanitizeWorkflowdefBefore(tenantId, workflowdef) {
   }
   // add prefix to tasks
   for (const task of workflowdef.tasks) {
-    addTenantIdPrefix(tenantId, task);
-
-    // add prefix to SUB_WORKFLOW tasks' referenced workflows
-    if (isSubworkflowTask(task)) {
-      addTenantIdPrefix(tenantId, task.subWorkflowParam);
-    }
+    sanitizeWorkflowTaskdefBefore(tenantId, task);
   }
   // add prefix to workflow
   addTenantIdPrefix(tenantId, workflowdef);
 }
 
+function sanitizeWorkflowTaskdefBefore(tenantId, task) {
+  addTenantIdPrefix(tenantId, task);
+
+  // add prefix to SUB_WORKFLOW tasks' referenced workflows
+  if (isSubworkflowTask(task)) {
+    addTenantIdPrefix(tenantId, task.subWorkflowParam);
+  }
+
+  // process decision tasks recursively
+  if (isDecisionTask(task)) {
+    const defaultCaseTasks = task.defaultCase ? task.defaultCase : [];
+    for (const nestedTask of defaultCaseTasks) {
+      sanitizeWorkflowTaskdefBefore(tenantId, nestedTask);
+    }
+
+    const decisionCaseIdToTasks = task.decisionCases ? task.decisionCases : {};
+    for (const nestedTasks of Object.values(decisionCaseIdToTasks)) {
+      for (const nestedTask of nestedTasks) {
+        sanitizeWorkflowTaskdefBefore(tenantId, nestedTask);
+      }
+    }
+  }
+}
 // Utility used after getting single or all workflowdefs to remove prefix from
 // workflowdef names, taskdef names.
 // Return true iif sanitization succeeded, false iif this
@@ -55,21 +74,7 @@ function sanitizeWorkflowdefAfter(tenantId, workflowdef) {
     // allowed are GLOBAL and those with tenantId prefix which will be removed
 
     for (const task of workflowdef.tasks) {
-      // remove prefix from SUB_WORKFLOW tasks' referenced workflows
-      if (isSubworkflowTask(task)) {
-        if (task.subWorkflowParam?.name) {
-          task.subWorkflowParam.name = task.subWorkflowParam.name.substr(
-            tenantWithInfixSeparator.length,
-          );
-        }
-      }
-
-      if (task.name.indexOf(tenantWithInfixSeparator) == 0) {
-        // remove prefix
-        task.name = task.name.substr(tenantWithInfixSeparator.length);
-      } else {
-        return false;
-      }
+      sanitizeWorkflowTaskdefAfter(tenantWithInfixSeparator, task);
     }
     // remove prefix
     workflowdef.name = workflowdef.name.substr(tenantWithInfixSeparator.length);
@@ -77,6 +82,44 @@ function sanitizeWorkflowdefAfter(tenantId, workflowdef) {
   } else {
     return false;
   }
+}
+
+function sanitizeWorkflowTaskdefAfter(tenantWithInfixSeparator, task) {
+  if (isDecisionTask(task)) {
+    const defaultCaseTasks = task.defaultCase ? task.defaultCase : [];
+    for (const nestedTask of defaultCaseTasks) {
+      if (!sanitizeWorkflowTaskdefAfter(tenantWithInfixSeparator, nestedTask)) {
+        return false;
+      }
+    }
+
+    const decisionCaseIdToTasks = task.decisionCases ? task.decisionCases : {};
+    for (const nestedTasks of Object.entries(decisionCaseIdToTasks)) {
+      for (const nestedTask of nestedTasks[1]) {
+        if (!sanitizeWorkflowTaskdefAfter(tenantWithInfixSeparator, nestedTask)) {
+          return false;
+        }
+      }
+    }
+  }
+
+  // remove prefix from SUB_WORKFLOW tasks' referenced workflows
+  if (isSubworkflowTask(task)) {
+    if (task.subWorkflowParam?.name) {
+      task.subWorkflowParam.name = task.subWorkflowParam.name.substr(
+        tenantWithInfixSeparator.length
+      );
+    }
+  }
+
+  if (task.name.indexOf(tenantWithInfixSeparator) == 0) {
+    // remove prefix
+    task.name = task.name.substr(tenantWithInfixSeparator.length);
+  } else {
+    return false;
+  }
+
+  return true;
 }
 
 // Retrieves all workflow definition along with blueprint

@@ -8,37 +8,36 @@
  * @format
  */
 
-import AppContent from '@fbcnms/ui/components/layout/AppContent';
-import AppContext, {AppContextProvider} from '@fbcnms/ui/context/AppContext';
-import AppSideBar from '@fbcnms/ui/components/layout/AppSideBar';
-import ApplicationMain from '@fbcnms/ui/components/ApplicationMain';
-import Button from '@fbcnms/ui/components/design-system/Button';
-import CreateService from './CreateService';
-import HubVersion from './HubVersion';
-import NavListItem from '@fbcnms/ui/components/NavListItem';
-import React, {useContext, useEffect, useState} from 'react';
-import RouterIcon from '@material-ui/icons/Router';
-import Shuffle from '@material-ui/icons/Shuffle';
-import Text from '@fbcnms/ui/components/design-system/Text';
-import TextInput from '@fbcnms/ui/components/design-system/Input/TextInput';
-import WorkflowApp from './workflow/App';
-import WorkflowServiceApp from './workflow/ServiceUiApp';
-import nullthrows from '@fbcnms/util/nullthrows';
-import {Redirect, Route, Switch} from 'react-router-dom';
-import {conductorApiUrlPrefix} from './workflow/constants';
-import {getProjectLinks} from '@fbcnms/projects/projects';
-import {HttpClient as http} from './workflow/common/HttpClient';
-import {makeStyles} from '@material-ui/styles';
-import {shouldShowSettings} from '@fbcnms/magmalte/app/components/Settings';
-import {useRelativeUrl} from '@fbcnms/ui/hooks/useRouter';
+import AppContent from "@fbcnms/ui/components/layout/AppContent";
+import AppContext, { AppContextProvider } from "@fbcnms/ui/context/AppContext";
+import AppSideBar from "@fbcnms/ui/components/layout/AppSideBar";
+import ApplicationMain from "@fbcnms/ui/components/ApplicationMain";
+import Button from "@fbcnms/ui/components/design-system/Button";
+import CreateService from "./CreateService";
+import HubVersion from "./HubVersion";
+import NavListItem from "@fbcnms/ui/components/NavListItem";
+import React, { useContext, useEffect, useState } from "react";
+import RouterIcon from "@material-ui/icons/Router";
+import Shuffle from "@material-ui/icons/Shuffle";
+import Text from "@fbcnms/ui/components/design-system/Text";
+import TextInput from "@fbcnms/ui/components/design-system/Input/TextInput";
+import WorkflowApp from "frinx-workflow-ui/lib/App";
+import WorkflowServiceApp from "frinx-workflow-ui/lib/ServiceUiApp";
+import nullthrows from "@fbcnms/util/nullthrows";
+import { Redirect, Route, Switch } from "react-router-dom";
+import { getProjectLinks } from "@fbcnms/projects/projects";
+import { HttpClient as http } from "frinx-workflow-ui/lib/common/HttpClient";
+import { makeStyles } from "@material-ui/styles";
+import { shouldShowSettings } from "@fbcnms/magmalte/app/components/Settings";
+import { useRelativeUrl } from "@fbcnms/ui/hooks/useRouter";
 
-const useStyles = makeStyles(theme => ({
+const useStyles = makeStyles((theme) => ({
   root: {
-    display: 'flex',
+    display: "flex",
   },
   header: {
-    display: 'flex',
-    justifyContent: 'space-between',
+    display: "flex",
+    justifyContent: "space-between",
   },
   paper: {
     margin: theme.spacing(3),
@@ -91,7 +90,7 @@ function CreateServiceForm() {
 }
 
 function Main(subApp) {
-  const {user, tabs, ssoEnabled} = useContext(AppContext);
+  const { user, tabs, ssoEnabled } = useContext(AppContext);
   const classes = useStyles();
   return (
     <div className={classes.root}>
@@ -110,32 +109,50 @@ function Main(subApp) {
   );
 }
 
+const conductorApiUrlPrefix = "/workflows";
+const conductorRbacApiUrlPrefix = conductorApiUrlPrefix + "/rbac";
+const frontendUrlPrefix = "/hub/workflows";
+
 export default () => {
   const [edit, setEdit] = useState(false);
-  const [currentUser, setCurrentUser] = useState('');
-  const {user} = useContext(AppContext);
+  const [currentUser, setCurrentUser] = useState("");
+  const { user } = useContext(AppContext);
 
   if (user !== currentUser) {
     setCurrentUser(user);
   }
 
   useEffect(() => {
-    http.get(conductorApiUrlPrefix + '/rbac/editableworkflows').then(res => {
+    http.get(conductorRbacApiUrlPrefix + "/editableworkflows").then((res) => {
       setEdit(res);
     });
   }, [currentUser]);
 
   const relativeUrl = useRelativeUrl();
   const cs = () => Main(CreateServiceForm());
-  const wf = () => Main(edit ? WorkflowApp() : WorkflowServiceApp());
+  const wf = () =>
+    Main(
+      edit
+        ? WorkflowApp({
+            frontendUrlPrefix: frontendUrlPrefix,
+            backendApiUrlPrefix: conductorApiUrlPrefix,
+            enableScheduling: true,
+          })
+        : WorkflowServiceApp({
+            frontendUrlPrefix: frontendUrlPrefix,
+            backendApiUrlPrefix: conductorRbacApiUrlPrefix,
+            enableScheduling: true,
+          })
+    );
+
   return (
     <ApplicationMain>
       <AppContextProvider>
         <Switch>
-          <Route path={relativeUrl('/services')} component={cs} />
-          <Route path={relativeUrl('/workflows')} component={wf} />
-          <Redirect exact from="/" to={relativeUrl('/hub')} />
-          <Redirect exact from="/hub" to={relativeUrl('/services')} />
+          <Route path={relativeUrl("/services")} component={cs} />
+          <Route path={relativeUrl("/workflows")} component={wf} />
+          <Redirect exact from="/" to={relativeUrl("/hub")} />
+          <Redirect exact from="/hub" to={relativeUrl("/services")} />
         </Switch>
       </AppContextProvider>
     </ApplicationMain>

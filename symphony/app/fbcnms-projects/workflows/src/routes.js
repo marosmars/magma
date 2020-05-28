@@ -105,7 +105,7 @@ export default async function(
     try {
       const result = await http.get(baseURLMeta + 'workflow', req);
       // combine with schedules
-      // FIXME this should not be here, schedules must be isolated from
+      // $FlowFixMe this should not be here, schedules must be isolated from
       // the rest of workflow API !
       if (addScheduleMetadata) {
         const schedules = await http.get(baseURLSchedule, req);
@@ -213,7 +213,7 @@ export default async function(
 
       let h: string = '-1';
       if (req.query.h !== 'undefined' && req.query.h !== '') {
-        /* FixMe req.query is user-controlled input, properties and values
+        /* $FlowFixMe req.query is user-controlled input, properties and values
          in this object are untrusted and should be validated before trusting */
         h = req.query.h;
       }
@@ -222,12 +222,12 @@ export default async function(
       }
       let start: number = 0;
       if (!isNaN(req.query.start)) {
-        // FixMe: isNaN is sketchy and accepts arrays
+        // $FlowFixMe: isNaN is sketchy and accepts arrays
         start = req.query.start;
       }
       let size: number = 1000;
       if (req.query.size !== 'undefined' && req.query.size !== '') {
-        /* FixMe req.query is user-controlled input, properties and values
+        /* $FlowFixMe req.query is user-controlled input, properties and values
          in this object are untrusted and should be validated before trusting */
         size = req.query.size;
       }
@@ -243,7 +243,7 @@ export default async function(
         '&start=' +
         start +
         '&query=' +
-        /* FixMe: req.query is user-controlled input and could
+        /* $FlowFixMe: req.query is user-controlled input and could
          be an array. Needs to be checked */
         encodeURIComponent(query);
       const result = await http.get(url, req);
@@ -430,7 +430,7 @@ export default async function(
     try {
       let size: number = 1000;
       if (req.query.size !== 'undefined' && req.query.size !== '') {
-        /* FixMe req.query is user-controlled input, properties and values
+        /* $FlowFixMe req.query is user-controlled input, properties and values
          in this object are untrusted and should be validated before trusting */
         size = req.query.size;
       }
@@ -438,7 +438,7 @@ export default async function(
       let count = 0;
       let start: number = 0;
       if (!isNaN(req.query.start)) {
-        // FixMe: isNaN is sketchy and accepts arrays
+        // $FlowFixMe: isNaN is sketchy and accepts arrays
         start = req.query.start;
         count = Number(start);
       }

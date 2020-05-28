@@ -8,7 +8,7 @@
   "dependencies": {
     "@fbcnms/ui": "^0.1.0",
     "classnames": "^2.2.5",
-    "frinx-workflow-ui": "^1.1.18",
+    "frinx-workflow-ui": "^1.1.19",
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
     "react-relay": "0.0.0-experimental-5f1cb628"
